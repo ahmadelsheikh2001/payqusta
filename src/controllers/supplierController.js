@@ -32,7 +32,13 @@ class SupplierController {
       const supplierIds = suppliers.map((s) => s._id);
       const productAgg = await Product.aggregate([
         { $match: { tenant: suppliers[0]?.tenant || null, supplier: { $in: supplierIds }, isActive: true } },
-        { $group: { _id: '$supplier', count: { $sum: 1 }, categories: { $addToSet: '$category' }, totalStock: { $sum: '$stock.quantity' } } },
+        { $group: {
+          _id: '$supplier',
+          count: { $sum: 1 },
+          categories: { $addToSet: '$category' },
+          totalStock: { $sum: '$stock.quantity' },
+          productNames: { $push: { name: '$name', sku: '$sku', stockQty: '$stock.quantity', stockStatus: '$stockStatus' } },
+        }},
       ]);
 
       const productMap = {};
@@ -43,6 +49,7 @@ class SupplierController {
         productsCount: productMap[s._id.toString()]?.count || 0,
         productCategories: productMap[s._id.toString()]?.categories || [],
         totalStock: productMap[s._id.toString()]?.totalStock || 0,
+        productNames: (productMap[s._id.toString()]?.productNames || []).slice(0, 10),
       }));
 
       ApiResponse.paginated(res, enriched, { page, limit, total });

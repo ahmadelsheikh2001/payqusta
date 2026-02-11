@@ -186,12 +186,45 @@ export default function SuppliersPage() {
 
                   {/* Category Tags */}
                   {(s.productCategories || []).length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mb-4">
+                    <div className="flex flex-wrap gap-1.5 mb-3">
                       {s.productCategories.map((cat) => (
                         <span key={cat} className="px-2.5 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-[10px] font-semibold text-gray-500">
                           {cat === 'هواتف' ? '📱' : cat === 'لابتوب' ? '💻' : cat === 'تابلت' ? '📟' : cat === 'شاشات' ? '🖥️' : cat === 'إكسسوارات' ? '🎧' : '📦'} {cat}
                         </span>
                       ))}
+                    </div>
+                  )}
+
+                  {/* Linked Products Preview */}
+                  {(s.productNames || []).length > 0 && (
+                    <div className="mb-4 p-3 rounded-xl bg-blue-50/50 dark:bg-blue-500/5 border border-blue-100 dark:border-blue-900/30">
+                      <p className="text-[10px] font-bold text-blue-500 dark:text-blue-400 mb-2 flex items-center gap-1">
+                        <Package className="w-3 h-3" /> المنتجات المرتبطة ({s.productsCount || s.productNames.length})
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {s.productNames.map((p, i) => (
+                          <span key={i} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium border ${
+                            p.stockStatus === 'out_of_stock'
+                              ? 'bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800'
+                              : p.stockStatus === 'low_stock'
+                                ? 'bg-yellow-50 dark:bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800'
+                                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700'
+                          }`}>
+                            {p.name}
+                            <span className={`text-[9px] ${
+                              p.stockStatus === 'out_of_stock' ? 'text-red-400' :
+                              p.stockStatus === 'low_stock' ? 'text-yellow-500' : 'text-gray-400'
+                            }`}>
+                              ({p.stockQty || 0})
+                            </span>
+                          </span>
+                        ))}
+                        {(s.productsCount || 0) > 10 && (
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-gray-100 dark:bg-gray-800 text-gray-400">
+                            +{s.productsCount - 10} أخرى
+                          </span>
+                        )}
+                      </div>
                     </div>
                   )}
 
