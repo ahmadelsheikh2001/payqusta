@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no, maximum-scale=1" />
+    <meta name="theme-color" content="#6366f1" />
+    <meta name="description" content="PayQusta — نظام إدارة المبيعات والأقساط المتكامل" />
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>PayQusta — نظام إدارة المبيعات والأقساط</title>
+    <!-- Cairo Font - Local for better performance -->
+    <link rel="stylesheet" href="/fonts/cairo.css">
+    <!-- Fallback to Google Fonts if local fails -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+    <script>
+      // Global Input Behavior: Auto-select text on focus
+      // This fixes the "delete written first" annoyance
+      document.addEventListener('focus', function(e) {
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+          const type = e.target.type;
+          if (['text', 'number', 'email', 'password', 'search', 'tel', 'url'].includes(type) || e.target.tagName === 'TEXTAREA') {
+            setTimeout(() => {
+              try { e.target.select(); } catch (err) {}
+            }, 10);
+          }
+        }
+      }, true);
+    </script>
+  </body>
+</html>
