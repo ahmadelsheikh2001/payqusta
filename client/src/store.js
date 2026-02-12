@@ -170,8 +170,6 @@ export const suppliersApi = {
   requestRestock: (id) => api.post(`/suppliers/${id}/request-restock`),
   getLowStockProducts: (id) => api.get(`/suppliers/${id}/low-stock-products`),
   getUpcomingPayments: (days) => api.get('/suppliers/upcoming-payments', { params: { days } }),
-  getLowStockProducts: (id) => api.get(`/suppliers/${id}/low-stock-products`),
-  requestRestock: (id) => api.post(`/suppliers/${id}/request-restock`),
 };
 
 // Dashboard API
@@ -260,4 +258,26 @@ export const reportsApi = {
   exportInventoryReport: (params) => api.get('/reports/export/inventory', { params, responseType: 'blob' }),
   exportCustomerReport: (params) => api.get('/reports/export/customers', { params, responseType: 'blob' }),
   exportProductPerformanceReport: (params) => api.get('/reports/export/products', { params, responseType: 'blob' }),
+};
+
+// Import API
+export const importApi = {
+  importProducts: (formData) => api.post('/import/products', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  importCustomers: (formData) => api.post('/import/customers', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  preview: (formData) => api.post('/import/preview', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  downloadTemplate: (type) => api.get(`/import/template/${type}`, { responseType: 'blob' }),
+};
+
+// Backup API
+export const backupApi = {
+  exportData: () => api.get('/backup/export', { responseType: 'blob' }),
+  getStats: () => api.get('/backup/stats'),
+  restore: (formData) => api.post('/backup/restore', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+};
+
+// Profile API
+export const profileApi = {
+  updateProfile: (data) => api.put('/auth/update-profile', data),
+  updateAvatar: (formData) => api.put('/auth/update-avatar', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  removeAvatar: () => api.delete('/auth/remove-avatar'),
 };

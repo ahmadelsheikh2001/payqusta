@@ -4,10 +4,11 @@ import {
   FileText, Send, Phone, Calendar, CreditCard, TrendingUp, TrendingDown,
   ShieldAlert, ShieldCheck, Ban, CheckCircle, Clock, AlertTriangle,
   Download, History, DollarSign, ChevronDown, ChevronUp, Package,
-  RefreshCw, ChevronLeft, ChevronRight,
+  RefreshCw, ChevronLeft, ChevronRight, CheckSquare, Square, XCircle, Trash2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { customersApi, creditApi } from '../store';
+import { notify } from '../components/AnimatedNotification';
+import { customersApi, creditApi, api } from '../store';
 import { Button, Input, Modal, Badge, Card, LoadingSpinner, EmptyState } from '../components/UI';
 import Pagination from '../components/Pagination';
 
@@ -33,6 +34,9 @@ export default function CustomersPage() {
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
   const [expandedInvoice, setExpandedInvoice] = useState(null);
   
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
   const printRef = useRef(null);
   const LIMIT = 15;
 
@@ -210,6 +214,36 @@ export default function CustomersPage() {
     setExpandedInvoice(expandedInvoice === invoiceId ? null : invoiceId);
   };
 
+  // Bulk selection
+  const toggleSelect = (id) => {
+    setSelectedIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+  };
+  const toggleSelectAll = () => {
+    if (selectedIds.length === customers.length) setSelectedIds([]);
+    else setSelectedIds(customers.map((c) => c._id));
+  };
+  const handleBulkDelete = () => {
+    notify.custom({
+      type: 'error',
+      title: 'تأكيد الحذف الجماعي',
+      message: `هل أنت متأكد من حذف ${selectedIds.length} عميل؟`,
+      duration: 10000,
+      action: {
+        label: `حذف ${selectedIds.length} عميل`,
+        onClick: async () => {
+          setBulkDeleting(true);
+          try {
+            await api.post('/customers/bulk-delete', { ids: selectedIds });
+            notify.success(`تم حذف ${selectedIds.length} عميل بنجاح`);
+            setSelectedIds([]);
+            load();
+          } catch { notify.error('حدث خطأ في الحذف الجماعي'); }
+          finally { setBulkDeleting(false); }
+        },
+      },
+    });
+  };
+
   return (
     <div className="space-y-5 animate-fade-in">
       {/* Header */}
@@ -229,6 +263,24 @@ export default function CustomersPage() {
         <Button icon={<Plus className="w-4 h-4" />} onClick={openAdd}>إضافة عميل</Button>
       </div>
 
+      {/* Bulk Actions Bar */}
+      {selectedIds.length > 0 && (
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-primary-50 dark:bg-primary-500/10 border-2 border-primary-200 dark:border-primary-500/30 animate-fade-in">
+          <button onClick={toggleSelectAll} className="p-1">
+            {selectedIds.length === customers.length ? <CheckSquare className="w-5 h-5 text-primary-500" /> : <Square className="w-5 h-5 text-primary-500" />}
+          </button>
+          <span className="text-sm font-bold text-primary-600 dark:text-primary-400">تم تحديد {selectedIds.length} عميل</span>
+          <div className="mr-auto flex gap-2">
+            <Button size="sm" variant="danger" icon={<Trash2 className="w-3.5 h-3.5" />} loading={bulkDeleting} onClick={handleBulkDelete}>
+              حذف المحدد
+            </Button>
+            <button onClick={() => setSelectedIds([])} className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition">
+              <XCircle className="w-4 h-4 text-gray-500" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Customers Table */}
       {loading ? <LoadingSpinner /> : customers.length === 0 ? (
         <EmptyState icon={<Users className="w-8 h-8" />} title="لا يوجد عملاء" description={search ? `لا نتائج لـ "${search}"` : 'ابدأ بإضافة أول عميل'} />
@@ -239,6 +291,11 @@ export default function CustomersPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b-2 border-gray-100 dark:border-gray-800">
+                    <th className="px-3 py-3 w-10">
+                      <button onClick={toggleSelectAll}>
+                        {selectedIds.length === customers.length && customers.length > 0 ? <CheckSquare className="w-4 h-4 text-primary-500" /> : <Square className="w-4 h-4 text-gray-400" />}
+                      </button>
+                    </th>
                     {['العميل', 'الهاتف', 'المشتريات', 'المستحق', 'النقاط', 'الحالة', 'الإجراءات'].map((h) => (
                       <th key={h} className="px-4 py-3 text-right text-xs font-bold text-gray-400 uppercase">{h}</th>
                     ))}
@@ -246,7 +303,15 @@ export default function CustomersPage() {
                 </thead>
                 <tbody>
                   {customers.map((c) => (
-                    <tr key={c._id} className={`border-b border-gray-50 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors ${c.salesBlocked ? 'bg-red-50/50 dark:bg-red-900/10' : ''}`}>
+                    <tr key={c._id} className={`border-b border-gray-50 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors ${c.salesBlocked ? 'bg-red-50/50 dark:bg-red-900/10' : ''} ${selectedIds.includes(c._id) ? 'bg-primary-50/50 dark:bg-primary-500/5' : ''}`}>
+                      <td className="px-3 py-3">
+                        <button onClick={() => toggleSelect(c._id)}>
+                          {selectedIds.includes(c._id)
+                            ? <CheckSquare className="w-4 h-4 text-primary-500" />
+                            : <Square className="w-4 h-4 text-gray-300 dark:text-gray-600 hover:text-primary-400" />
+                          }
+                        </button>
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <div className={`w-9 h-9 rounded-lg flex items-center justify-center font-bold text-sm ${c.salesBlocked ? 'bg-red-100 dark:bg-red-500/20 text-red-600' : 'bg-primary-50 dark:bg-primary-500/10 text-primary-600'}`}>

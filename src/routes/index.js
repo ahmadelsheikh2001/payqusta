@@ -19,6 +19,27 @@ const settingsController = require('../controllers/settingsController');
 const adminController = require('../controllers/adminController');
 const reportsController = require('../controllers/reportsController');
 const searchController = require('../controllers/searchController');
+const importController = require('../controllers/importController');
+const backupController = require('../controllers/backupController');
+const { uploadSingle } = require('../middleware/upload');
+
+// ============ HEALTH CHECK (Public) ============
+router.get('/health', async (req, res) => {
+  const mongoose = require('mongoose');
+  const dbState = mongoose.connection.readyState;
+  const dbStatus = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
+  res.status(dbState === 1 ? 200 : 503).json({
+    status: dbState === 1 ? 'healthy' : 'unhealthy',
+    timestamp: new Date().toISOString(),
+    uptime: Math.floor(process.uptime()),
+    database: dbStatus[dbState] || 'unknown',
+    memory: {
+      used: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`,
+      total: `${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)}MB`,
+    },
+    version: require('../../package.json').version,
+  });
+});
 
 // ============ AUTH ROUTES (Public) ============
 router.post('/auth/register', authController.register);
@@ -33,6 +54,9 @@ router.use(tenantScope); // All routes below are tenant-scoped
 // --- Auth ---
 router.get('/auth/me', authController.getMe);
 router.put('/auth/update-password', authController.updatePassword);
+router.put('/auth/update-profile', authController.updateProfile);
+router.put('/auth/update-avatar', uploadSingle, authController.updateAvatar);
+router.delete('/auth/remove-avatar', authController.removeAvatar);
 router.post('/auth/add-user', authorize('vendor', 'admin'), authController.addUser);
 
 // --- Dashboard --- (vendor, admin, coordinator can view)
@@ -50,7 +74,6 @@ router.get('/dashboard/credit-engine', authorize('vendor', 'admin'), dashboardCo
 router.get('/dashboard/customer-lifetime-value', authorize('vendor', 'admin'), dashboardController.getCustomerLifetimeValue);
 
 // --- Products --- (coordinator can view and update stock)
-const { uploadSingle } = require('../middleware/upload');
 router.get('/products', productController.getAll);
 router.get('/products/low-stock', authorize('vendor', 'admin', 'coordinator'), productController.getLowStock);
 router.get('/products/summary', authorize('vendor', 'admin', 'coordinator'), productController.getStockSummary);
@@ -186,5 +209,48 @@ router.get('/reports/export/products', authorize('vendor', 'admin', 'coordinator
 router.get('/search', searchController.globalSearch);
 router.get('/search/suggestions', searchController.getSearchSuggestions);
 router.get('/search/quick', searchController.quickSearchByBarcode);
+
+// ============ IMPORT ROUTES ============
+const multer = require('multer');
+const importUpload = multer({
+  dest: 'uploads/imports/',
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  fileFilter: (req, file, cb) => {
+    const allowed = ['.xlsx', '.xls', '.csv'];
+    const ext = require('path').extname(file.originalname).toLowerCase();
+    cb(null, allowed.includes(ext));
+  },
+});
+
+router.post('/import/products', authorize('vendor', 'admin'), importUpload.single('file'), auditLog('import', 'product'), importController.importProducts);
+router.post('/import/customers', authorize('vendor', 'admin'), importUpload.single('file'), auditLog('import', 'customer'), importController.importCustomers);
+router.post('/import/preview', authorize('vendor', 'admin'), importUpload.single('file'), importController.previewFile);
+router.get('/import/template/:type', authorize('vendor', 'admin'), importController.downloadTemplate);
+
+// ============ BACKUP ROUTES ============
+router.get('/backup/export', authorize('vendor', 'admin'), backupController.exportData);
+router.get('/backup/stats', authorize('vendor', 'admin'), backupController.getStats);
+router.post('/backup/restore', authorize('vendor', 'admin'), importUpload.single('file'), auditLog('restore', 'backup'), backupController.restoreData);
+
+// ============ BULK OPERATIONS ============
+router.post('/products/bulk-delete', authorize('vendor', 'admin'), auditLog('bulk_delete', 'product'), async (req, res, next) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) return next(require('../utils/AppError').badRequest('يرجى تحديد المنتجات'));
+    const Product = require('../models/Product');
+    const result = await Product.updateMany({ _id: { $in: ids }, ...req.tenantFilter }, { isActive: false });
+    require('../utils/ApiResponse').success(res, { deletedCount: result.modifiedCount }, `تم حذف ${result.modifiedCount} منتج`);
+  } catch (error) { next(error); }
+});
+
+router.post('/customers/bulk-delete', authorize('vendor', 'admin'), auditLog('bulk_delete', 'customer'), async (req, res, next) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) return next(require('../utils/AppError').badRequest('يرجى تحديد العملاء'));
+    const Customer = require('../models/Customer');
+    const result = await Customer.updateMany({ _id: { $in: ids }, ...req.tenantFilter }, { isActive: false });
+    require('../utils/ApiResponse').success(res, { deletedCount: result.modifiedCount }, `تم حذف ${result.modifiedCount} عميل`);
+  } catch (error) { next(error); }
+});
 
 module.exports = router;

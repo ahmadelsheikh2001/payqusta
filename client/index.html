@@ -16,8 +16,58 @@
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Pre-React Loading Screen (shows while JS bundles load) -->
+      <div id="pre-loader" style="
+        position: fixed; inset: 0; z-index: 99999;
+        display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 24px;
+        background: linear-gradient(135deg, #0a0a0f 0%, #111827 50%, #0a0a0f 100%);
+      ">
+        <div style="
+          width: 80px; height: 80px; border-radius: 16px;
+          background: linear-gradient(135deg, #6366f1, #7c3aed);
+          display: flex; align-items: center; justify-content: center;
+          box-shadow: 0 20px 40px rgba(99,102,241,0.3);
+          animation: pulse-logo 2s ease-in-out infinite;
+        ">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+          </svg>
+        </div>
+        <div style="text-align: center;">
+          <h1 style="
+            font-family: 'Cairo', sans-serif; font-size: 36px; font-weight: 900;
+            color: white; margin: 0; letter-spacing: -0.5px;
+          ">Pay<span style="background: linear-gradient(90deg, #818cf8, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Qusta</span></h1>
+          <p style="font-family: 'Cairo', sans-serif; color: #6b7280; font-size: 12px; margin-top: 4px;">Smart Sales & Inventory Management</p>
+        </div>
+        <div style="width: 160px; height: 3px; border-radius: 4px; background: #1f2937; overflow: hidden;">
+          <div style="
+            width: 50%; height: 100%; border-radius: 4px;
+            background: linear-gradient(90deg, #6366f1, #a78bfa, #6366f1);
+            animation: loading-bar 1.2s ease-in-out infinite;
+          "></div>
+        </div>
+        <style>
+          @keyframes pulse-logo { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+          @keyframes loading-bar { 0% { transform: translateX(-100%); } 100% { transform: translateX(200%); } }
+        </style>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
+    <script>
+      // Remove pre-loader when React mounts
+      const observer = new MutationObserver(() => {
+        const preLoader = document.getElementById('pre-loader');
+        if (preLoader && document.getElementById('root').children.length > 1) {
+          preLoader.style.transition = 'opacity 0.3s';
+          preLoader.style.opacity = '0';
+          setTimeout(() => preLoader.remove(), 300);
+          observer.disconnect();
+        }
+      });
+      observer.observe(document.getElementById('root'), { childList: true });
+    </script>
     <script>
       // Global Input Behavior: Auto-select text on focus
       // This fixes the "delete written first" annoyance

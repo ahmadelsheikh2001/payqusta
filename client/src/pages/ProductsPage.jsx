@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, Edit, Trash2, Package, Check, Truck, MessageCircle, Send, AlertTriangle, Scan, Upload, X as XIcon, Image as ImageIcon } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Package, Check, Truck, MessageCircle, Send, AlertTriangle, Scan, Upload, X as XIcon, Image as ImageIcon, CheckSquare, Square, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { notify } from '../components/AnimatedNotification';
-import { productsApi, suppliersApi } from '../store';
+import { productsApi, suppliersApi, api } from '../store';
 import { Button, Input, Select, Modal, Badge, Card, LoadingSpinner, EmptyState } from '../components/UI';
 import Pagination from '../components/Pagination';
 import BarcodeScanner from '../components/BarcodeScanner';
@@ -25,6 +25,8 @@ export default function ProductsPage() {
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [productImages, setProductImages] = useState([]);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [form, setForm] = useState({
     name: '', sku: '', barcode: '', category: 'هواتف', price: '', cost: '',
     stockQuantity: '', minQuantity: '5', description: '', supplier: '',
@@ -86,6 +88,36 @@ export default function ProductsPage() {
           } catch (err) {
             notify.error('فشل حذف المنتج', 'خطأ في الحذف');
           }
+        },
+      },
+    });
+  };
+
+  // Bulk selection
+  const toggleSelect = (id) => {
+    setSelectedIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+  };
+  const toggleSelectAll = () => {
+    if (selectedIds.length === products.length) setSelectedIds([]);
+    else setSelectedIds(products.map((p) => p._id));
+  };
+  const handleBulkDelete = () => {
+    notify.custom({
+      type: 'error',
+      title: 'تأكيد الحذف الجماعي',
+      message: `هل أنت متأكد من حذف ${selectedIds.length} منتج؟`,
+      duration: 10000,
+      action: {
+        label: `حذف ${selectedIds.length} منتج`,
+        onClick: async () => {
+          setBulkDeleting(true);
+          try {
+            await api.post('/products/bulk-delete', { ids: selectedIds });
+            notify.success(`تم حذف ${selectedIds.length} منتج بنجاح`);
+            setSelectedIds([]);
+            loadProducts();
+          } catch { notify.error('حدث خطأ في الحذف الجماعي'); }
+          finally { setBulkDeleting(false); }
         },
       },
     });
@@ -229,6 +261,24 @@ export default function ProductsPage() {
         <Button icon={<Plus className="w-4 h-4" />} onClick={openAdd}>إضافة منتج</Button>
       </div>
 
+      {/* Bulk Actions Bar */}
+      {selectedIds.length > 0 && (
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-primary-50 dark:bg-primary-500/10 border-2 border-primary-200 dark:border-primary-500/30 animate-fade-in">
+          <button onClick={toggleSelectAll} className="p-1">
+            {selectedIds.length === products.length ? <CheckSquare className="w-5 h-5 text-primary-500" /> : <Square className="w-5 h-5 text-primary-500" />}
+          </button>
+          <span className="text-sm font-bold text-primary-600 dark:text-primary-400">تم تحديد {selectedIds.length} منتج</span>
+          <div className="mr-auto flex gap-2">
+            <Button size="sm" variant="danger" icon={<Trash2 className="w-3.5 h-3.5" />} loading={bulkDeleting} onClick={handleBulkDelete}>
+              حذف المحدد
+            </Button>
+            <button onClick={() => setSelectedIds([])} className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition">
+              <XCircle className="w-4 h-4 text-gray-500" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Low Stock Supplier Alert */}
       {Object.keys(lowStockBySupplier).length > 0 && (
         <Card className="p-4 border-2 border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10">
@@ -267,7 +317,17 @@ export default function ProductsPage() {
             {products.map((p) => {
               const supplierName = getSupplierName(p);
               return (
-                <Card key={p._id} hover className="p-5 animate-fade-in">
+                <Card key={p._id} hover className={`p-5 animate-fade-in relative ${selectedIds.includes(p._id) ? 'ring-2 ring-primary-500' : ''}`}>
+                  {/* Selection Checkbox */}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); toggleSelect(p._id); }}
+                    className="absolute top-3 left-3 z-10"
+                  >
+                    {selectedIds.includes(p._id)
+                      ? <CheckSquare className="w-5 h-5 text-primary-500" />
+                      : <Square className="w-5 h-5 text-gray-300 dark:text-gray-600 hover:text-primary-400" />
+                    }
+                  </button>
                   {/* Product Image or Icon */}
                   <div className="flex justify-between items-start mb-3">
                     {p.thumbnail || (p.images && p.images.length > 0) ? (

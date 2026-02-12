@@ -22,6 +22,8 @@ const connectDB = require('./src/config/database');
 const { errorHandler, notFound } = require('./src/middleware/errorHandler');
 const logger = require('./src/utils/logger');
 const routes = require('./src/routes');
+const swaggerSpec = require('./src/config/swagger');
+const swaggerUi = require('swagger-ui-express');
 
 // Import scheduled jobs
 const InstallmentScheduler = require('./src/jobs/InstallmentScheduler');
@@ -189,6 +191,22 @@ class PayQustaServer {
       });
     });
 
+    // Swagger API Documentation
+    this.app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+      customCss: '.swagger-ui .topbar { display: none }',
+      customSiteTitle: 'PayQusta API Documentation',
+      swaggerOptions: {
+        persistAuthorization: true,
+        docExpansion: 'none',
+        filter: true,
+        tagsSorter: 'alpha',
+      },
+    }));
+    this.app.get('/api-docs.json', (req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      res.send(swaggerSpec);
+    });
+
     // API routes
     this.app.use('/api/v1', routes);
 
@@ -257,6 +275,7 @@ class PayQustaServer {
 ║  Port        : ${this.port}
 ║  API URL     : http://localhost:${this.port}/api/v1
 ║  Health      : http://localhost:${this.port}/api/health
+║  API Docs    : http://localhost:${this.port}/api-docs
 ╚══════════════════════════════════════════════╝
       `);
     });

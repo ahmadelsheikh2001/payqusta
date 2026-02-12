@@ -273,6 +273,66 @@ class AuthController {
   }
 
   /**
+   * PUT /api/v1/auth/update-profile
+   * Update user name and phone
+   */
+  async updateProfile(req, res, next) {
+    try {
+      const { name, phone } = req.body;
+
+      const user = await User.findById(req.user._id);
+      if (!user) return next(AppError.notFound('المستخدم غير موجود'));
+
+      if (name) user.name = name;
+      if (phone) user.phone = phone;
+
+      await user.save({ validateBeforeSave: false });
+
+      ApiResponse.success(res, { user: Helpers.sanitizeUser(user) }, 'تم تحديث الملف الشخصي بنجاح');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * PUT /api/v1/auth/update-avatar
+   * Upload user avatar
+   */
+  async updateAvatar(req, res, next) {
+    try {
+      if (!req.file) return next(AppError.badRequest('يرجى اختيار صورة'));
+
+      const user = await User.findById(req.user._id);
+      if (!user) return next(AppError.notFound('المستخدم غير موجود'));
+
+      user.avatar = `/uploads/images/${req.file.filename}`;
+      await user.save({ validateBeforeSave: false });
+
+      ApiResponse.success(res, { avatar: user.avatar }, 'تم تحديث الصورة الشخصية');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * DELETE /api/v1/auth/remove-avatar
+   * Remove user avatar
+   */
+  async removeAvatar(req, res, next) {
+    try {
+      const user = await User.findById(req.user._id);
+      if (!user) return next(AppError.notFound('المستخدم غير موجود'));
+
+      user.avatar = null;
+      await user.save({ validateBeforeSave: false });
+
+      ApiResponse.success(res, null, 'تم حذف الصورة الشخصية');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * POST /api/v1/auth/add-user
    * Add a user to the tenant (supplier, coordinator, etc.)
    */

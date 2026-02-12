@@ -5,6 +5,7 @@ import {
   Settings, LogOut, X, Zap, BarChart3, Target, Receipt,
   AlertTriangle, ChevronDown, ChevronLeft, Boxes, Clock,
   PieChart, TrendingUp, Crown, Building2, Shield, Activity,
+  Upload, Database, UserCircle,
 } from 'lucide-react';
 import { useAuthStore } from '../store';
 
@@ -23,6 +24,9 @@ export default function Sidebar({ open, onClose }) {
   const [reportsOpen, setReportsOpen] = useState(
     location.pathname.startsWith('/reports') || location.pathname === '/aging-report' || location.pathname === '/business-reports'
   );
+  const [toolsOpen, setToolsOpen] = useState(
+    location.pathname === '/import' || location.pathname === '/backup'
+  );
 
   const handleLogout = () => {
     logout();
@@ -33,6 +37,7 @@ export default function Sidebar({ open, onClose }) {
   const isAdminActive = location.pathname.startsWith('/admin');
   const isProductsActive = location.pathname.startsWith('/products') || location.pathname === '/low-stock';
   const isReportsActive = location.pathname.startsWith('/reports') || location.pathname === '/aging-report' || location.pathname === '/business-reports';
+  const isToolsActive = location.pathname === '/import' || location.pathname === '/backup';
 
   const NavItem = ({ to, icon: Icon, label, end = false, badge = null }) => (
     <NavLink
@@ -183,6 +188,24 @@ export default function Sidebar({ open, onClose }) {
           </div>
         </div>
 
+        {/* Tools Dropdown */}
+        <div>
+          <DropdownButton
+            isOpen={toolsOpen}
+            isActive={isToolsActive}
+            onClick={() => setToolsOpen(!toolsOpen)}
+            icon={Database}
+            label="الأدوات"
+          />
+          <div className={`overflow-hidden transition-all duration-200 ${toolsOpen ? 'max-h-40 mt-1' : 'max-h-0'}`}>
+            <div className="space-y-1 py-1">
+              <SubNavItem to="/import" icon={Upload} label="استيراد البيانات" />
+              <SubNavItem to="/backup" icon={Database} label="النسخ الاحتياطي" />
+            </div>
+          </div>
+        </div>
+
+        <NavItem to="/profile" icon={UserCircle} label="الملف الشخصي" />
         <NavItem to="/settings" icon={Settings} label="الإعدادات" />
       </nav>
 

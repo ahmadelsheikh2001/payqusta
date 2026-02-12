@@ -8,7 +8,9 @@
       "Bash(wc:*)",
       "Bash(timeout 8 npm run dev:*)",
       "Bash(netstat:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(find . -name \"*.jsx\" -type f -exec wc -l {} +)",
+      "Bash(find:*)"
     ]
   }
 }
