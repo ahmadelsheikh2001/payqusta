@@ -9,6 +9,18 @@ const AppError = require('../utils/AppError');
 const ApiResponse = require('../utils/ApiResponse');
 const Helpers = require('../utils/helpers');
 
+// Helper: Calculate next due date for recurring expenses
+function calculateNextDue(date, frequency) {
+  const d = new Date(date);
+  switch (frequency) {
+    case 'daily': d.setDate(d.getDate() + 1); break;
+    case 'weekly': d.setDate(d.getDate() + 7); break;
+    case 'monthly': d.setMonth(d.getMonth() + 1); break;
+    case 'yearly': d.setFullYear(d.getFullYear() + 1); break;
+  }
+  return d;
+}
+
 class ExpenseController {
   /**
    * GET /api/v1/expenses
@@ -108,7 +120,7 @@ class ExpenseController {
         paymentMethod: paymentMethod || 'cash',
         reference,
         createdBy: req.user._id,
-        nextDueDate: isRecurring ? this._calculateNextDue(date || new Date(), frequency) : undefined,
+        nextDueDate: isRecurring ? calculateNextDue(date || new Date(), frequency) : undefined,
       });
 
       ApiResponse.created(res, expense, 'تم إضافة المصروف بنجاح');
@@ -153,17 +165,6 @@ class ExpenseController {
     }
   }
 
-  // Helper: Calculate next due date for recurring
-  _calculateNextDue(date, frequency) {
-    const d = new Date(date);
-    switch (frequency) {
-      case 'daily': d.setDate(d.getDate() + 1); break;
-      case 'weekly': d.setDate(d.getDate() + 7); break;
-      case 'monthly': d.setMonth(d.getMonth() + 1); break;
-      case 'yearly': d.setFullYear(d.getFullYear() + 1); break;
-    }
-    return d;
-  }
 }
 
 module.exports = new ExpenseController();

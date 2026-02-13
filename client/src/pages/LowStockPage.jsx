@@ -110,7 +110,17 @@ export default function LowStockPage() {
 
   const fmt = (n) => (n || 0).toLocaleString('ar-EG');
 
-  const stockBadge = (status) => {
+  // Compute stock status from actual quantities (not cached field)
+  const getStockStatus = (product) => {
+    const qty = product.stock?.quantity || 0;
+    const minQty = product.stock?.minQuantity || 5;
+    if (qty <= 0) return 'out_of_stock';
+    if (qty <= minQty) return 'low_stock';
+    return 'in_stock';
+  };
+
+  const stockBadge = (product) => {
+    const status = getStockStatus(product);
     if (status === 'out_of_stock') return <Badge variant="danger">نفذ</Badge>;
     if (status === 'low_stock') return <Badge variant="warning">منخفض</Badge>;
     return <Badge variant="success">متوفر</Badge>;
@@ -159,13 +169,13 @@ export default function LowStockPage() {
             <Card className="p-4 border-2 border-red-100 dark:border-red-500/20">
               <p className="text-xs text-gray-400">نفذ من المخزون</p>
               <p className="text-2xl font-black text-red-600">
-                {products.filter(p => p.stockStatus === 'out_of_stock').length}
+                {products.filter(p => getStockStatus(p) === 'out_of_stock').length}
               </p>
             </Card>
             <Card className="p-4 border-2 border-amber-100 dark:border-amber-500/20">
               <p className="text-xs text-gray-400">مخزون منخفض</p>
               <p className="text-2xl font-black text-amber-600">
-                {products.filter(p => p.stockStatus === 'low_stock').length}
+                {products.filter(p => getStockStatus(p) === 'low_stock').length}
               </p>
             </Card>
             <Card className="p-4 border-2 border-primary-100 dark:border-primary-500/20">
@@ -237,7 +247,7 @@ export default function LowStockPage() {
                         <tr key={product._id} className="border-b border-gray-50 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
-                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${product.stockStatus === 'out_of_stock' ? 'bg-red-100 dark:bg-red-500/20 text-red-500' : 'bg-amber-100 dark:bg-amber-500/20 text-amber-500'}`}>
+                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${getStockStatus(product) === 'out_of_stock' ? 'bg-red-100 dark:bg-red-500/20 text-red-500' : 'bg-amber-100 dark:bg-amber-500/20 text-amber-500'}`}>
                                 <Package className="w-4 h-4" />
                               </div>
                               <span className="font-semibold">{product.name}</span>
@@ -251,7 +261,7 @@ export default function LowStockPage() {
                           </td>
                           <td className="px-4 py-3 text-gray-500">{product.stock?.minQuantity || 5}</td>
                           <td className="px-4 py-3 font-bold text-primary-600">{needed}</td>
-                          <td className="px-4 py-3">{stockBadge(product.stockStatus)}</td>
+                          <td className="px-4 py-3">{stockBadge(product)}</td>
                           <td className="px-4 py-3">
                             {supplierId !== 'no-supplier' ? (
                               <Button 

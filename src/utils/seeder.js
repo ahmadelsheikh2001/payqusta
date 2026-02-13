@@ -80,14 +80,14 @@ const seed = async () => {
   // 2. Create Users
   console.log('👤 Creating users...');
 
-  // Admin User (Super Admin - no tenant)
+  // Admin User (Super Admin - linked to tenant for data operations)
   const adminUser = await User.create({
     name: 'مدير النظام',
     email: 'admin@payqusta.com',
     phone: '01999999999',
     password: 'admin123456',
     role: 'admin',
-    tenant: null, // Admin has no specific tenant
+    tenant: tenant._id,
   });
 
   const vendorUser = await User.create({

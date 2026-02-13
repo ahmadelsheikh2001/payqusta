@@ -131,6 +131,13 @@ class InvoiceController {
         // Deduct stock
         product.stock.quantity -= item.quantity;
         await product.save();
+
+        // Trigger low stock / out of stock notifications
+        if (product.stock.quantity <= 0 && !product.outOfStockAlertSent) {
+          NotificationService.onOutOfStock(req.tenantId, product).catch(() => {});
+        } else if (product.stock.quantity <= product.stock.minQuantity && !product.lowStockAlertSent) {
+          NotificationService.onLowStock(req.tenantId, product).catch(() => {});
+        }
       }
 
       // Calculate total (NO TAX — as per BRD)

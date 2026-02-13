@@ -53,39 +53,58 @@ export default function NotificationDropdown() {
     setLoading(false);
   }, []);
 
-  // SSE real-time connection
+  // SSE real-time connection with auto-reconnect
   useEffect(() => {
     const token = localStorage.getItem('payqusta_token');
     if (!token) return;
 
     let eventSource;
-    try {
-      eventSource = new EventSource(`/api/v1/notifications/stream?token=${token}`);
+    let retryTimeout;
+    let retryCount = 0;
+    let unmounted = false;
 
-      eventSource.onmessage = (event) => {
-        try {
-          const notification = JSON.parse(event.data);
-          if (notification.type === 'connected') return;
+    const connect = () => {
+      if (unmounted) return;
+      try {
+        eventSource = new EventSource(`/api/v1/notifications/stream?token=${token}`);
 
-          // Add to top of list
-          setNotifications((prev) => [notification, ...prev].slice(0, 30));
-          setUnreadCount((prev) => prev + 1);
+        eventSource.onopen = () => {
+          retryCount = 0;
+        };
 
-          // Show browser notification if permitted
-          if (Notification.permission === 'granted') {
-            new Notification(notification.title, { body: notification.message, icon: '/favicon.svg' });
-          }
-        } catch (e) {}
-      };
+        eventSource.onmessage = (event) => {
+          try {
+            const notification = JSON.parse(event.data);
+            if (notification.type === 'connected') return;
 
-      eventSource.onerror = () => {
-        eventSource.close();
-        // Retry after 10s
-        setTimeout(() => {}, 10000);
-      };
-    } catch (e) {}
+            setNotifications((prev) => [notification, ...prev].slice(0, 30));
+            setUnreadCount((prev) => prev + 1);
 
-    return () => eventSource?.close();
+            // Browser notification
+            if (window.Notification && window.Notification.permission === 'granted') {
+              new window.Notification(notification.title, { body: notification.message, icon: '/favicon.svg' });
+            }
+          } catch (e) {}
+        };
+
+        eventSource.onerror = () => {
+          eventSource.close();
+          if (unmounted) return;
+          // Exponential backoff: 3s, 6s, 12s, max 30s
+          const delay = Math.min(3000 * Math.pow(2, retryCount), 30000);
+          retryCount++;
+          retryTimeout = setTimeout(connect, delay);
+        };
+      } catch (e) {}
+    };
+
+    connect();
+
+    return () => {
+      unmounted = true;
+      clearTimeout(retryTimeout);
+      eventSource?.close();
+    };
   }, []);
 
   // Poll unread count every 30s
@@ -113,8 +132,8 @@ export default function NotificationDropdown() {
 
   // Request browser notification permission
   useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
+    if ('Notification' in window && window.Notification.permission === 'default') {
+      window.Notification.requestPermission();
     }
   }, []);
 

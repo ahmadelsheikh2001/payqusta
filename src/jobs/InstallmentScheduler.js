@@ -10,6 +10,7 @@ const Tenant = require('../models/Tenant');
 const Supplier = require('../models/Supplier');
 const User = require('../models/User');
 const WhatsAppService = require('../services/WhatsAppService');
+const NotificationService = require('../services/NotificationService');
 const logger = require('../utils/logger');
 
 class InstallmentScheduler {
@@ -44,11 +45,7 @@ class InstallmentScheduler {
     try {
       logger.info('🔍 Checking customer installments...');
 
-      const tenants = await Tenant.find({
-        isActive: true,
-        'whatsapp.enabled': true,
-        'whatsapp.notifications.installmentReminder': true,
-      });
+      const tenants = await Tenant.find({ isActive: true });
 
       for (const tenant of tenants) {
         // Find invoices with installments due tomorrow
@@ -77,32 +74,43 @@ class InstallmentScheduler {
 
           for (const installment of dueInstallments) {
             try {
-              const phone =
-                invoice.customer.whatsapp?.number || invoice.customer.phone;
+              // In-app notification (always fires)
+              NotificationService.onInstallmentDue(
+                tenant._id,
+                invoice.customer.name,
+                invoice.invoiceNumber,
+                installment.amount,
+                installment.dueDate
+              ).catch(() => {});
 
-              // Send reminder to customer
-              await WhatsAppService.sendInstallmentReminder(
-                phone,
-                invoice.customer,
-                invoice,
-                installment
-              );
+              // WhatsApp reminder (only if enabled)
+              if (tenant.whatsapp?.enabled && tenant.whatsapp?.notifications?.installmentReminder) {
+                const phone =
+                  invoice.customer.whatsapp?.number || invoice.customer.phone;
 
-              // Also send reminder to vendor
-              const vendor = await User.findOne({
-                tenant: tenant._id,
-                role: 'vendor',
-              });
+                await WhatsAppService.sendInstallmentReminder(
+                  phone,
+                  invoice.customer,
+                  invoice,
+                  installment
+                );
 
-              if (vendor) {
-                const vendorMessage =
-                  `⏰ تذكير: العميل *${invoice.customer.name}* عليه قسط ` +
-                  `*${installment.amount.toLocaleString('ar-EG')} ج.م* ` +
-                  `مستحق غداً — فاتورة ${invoice.invoiceNumber}\n` +
-                  `تم السداد: ${invoice.paidAmount.toLocaleString('ar-EG')} ج.م\n` +
-                  `المتبقي: ${invoice.remainingAmount.toLocaleString('ar-EG')} ج.م`;
+                // Also send reminder to vendor
+                const vendor = await User.findOne({
+                  tenant: tenant._id,
+                  role: 'vendor',
+                });
 
-                await WhatsAppService.sendMessage(vendor.phone, vendorMessage);
+                if (vendor) {
+                  const vendorMessage =
+                    `⏰ تذكير: العميل *${invoice.customer.name}* عليه قسط ` +
+                    `*${installment.amount.toLocaleString('ar-EG')} ج.م* ` +
+                    `مستحق غداً — فاتورة ${invoice.invoiceNumber}\n` +
+                    `تم السداد: ${invoice.paidAmount.toLocaleString('ar-EG')} ج.م\n` +
+                    `المتبقي: ${invoice.remainingAmount.toLocaleString('ar-EG')} ج.م`;
+
+                  await WhatsAppService.sendMessage(vendor.phone, vendorMessage);
+                }
               }
 
               // Mark reminder as sent
@@ -134,11 +142,7 @@ class InstallmentScheduler {
     try {
       logger.info('🔍 Checking supplier payments...');
 
-      const tenants = await Tenant.find({
-        isActive: true,
-        'whatsapp.enabled': true,
-        'whatsapp.notifications.supplierPaymentDue': true,
-      });
+      const tenants = await Tenant.find({ isActive: true });
 
       for (const tenant of tenants) {
         const suppliers = await Supplier.getUpcomingPayments(tenant._id, 1);
@@ -159,12 +163,22 @@ class InstallmentScheduler {
 
           for (const payment of pendingPayments) {
             try {
-              // Send to vendor
-              await WhatsAppService.sendVendorSupplierPaymentReminder(
-                vendor.phone,
-                supplier,
-                payment
-              );
+              // In-app notification (always fires)
+              NotificationService.onSupplierPaymentDue(
+                tenant._id,
+                supplier.name,
+                payment.amount,
+                payment.dueDate
+              ).catch(() => {});
+
+              // WhatsApp reminder (only if enabled)
+              if (tenant.whatsapp?.enabled && tenant.whatsapp?.notifications?.supplierPaymentDue) {
+                await WhatsAppService.sendVendorSupplierPaymentReminder(
+                  vendor.phone,
+                  supplier,
+                  payment
+                );
+              }
 
               payment.reminderSent = true;
             } catch (err) {
@@ -192,6 +206,29 @@ class InstallmentScheduler {
       logger.info('🔍 Marking overdue installments...');
 
       const now = new Date();
+
+      // Find invoices with newly overdue installments (before marking them)
+      const overdueInvoices = await Invoice.find({
+        'installments.status': 'pending',
+        'installments.dueDate': { $lt: now },
+      }).populate('customer', 'name');
+
+      // Send in-app notifications for newly overdue installments
+      for (const invoice of overdueInvoices) {
+        const overdueInstallments = invoice.installments.filter(
+          (i) => i.status === 'pending' && i.dueDate < now
+        );
+        for (const inst of overdueInstallments) {
+          NotificationService.onInstallmentOverdue(
+            invoice.tenant,
+            invoice.customer?.name || 'عميل',
+            invoice.invoiceNumber,
+            inst.amount
+          ).catch(() => {});
+        }
+      }
+
+      // Mark them as overdue
       const result = await Invoice.updateMany(
         { 'installments.status': 'pending', 'installments.dueDate': { $lt: now } },
         { $set: { 'installments.$[elem].status': 'overdue' } },

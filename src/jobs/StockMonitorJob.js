@@ -9,6 +9,7 @@ const Product = require('../models/Product');
 const Tenant = require('../models/Tenant');
 const User = require('../models/User');
 const WhatsAppService = require('../services/WhatsAppService');
+const NotificationService = require('../services/NotificationService');
 const logger = require('../utils/logger');
 
 class StockMonitorJob {
@@ -28,10 +29,7 @@ class StockMonitorJob {
     try {
       logger.info('📦 Checking stock levels...');
 
-      const tenants = await Tenant.find({
-        isActive: true,
-        'settings.autoRestockAlert': true,
-      });
+      const tenants = await Tenant.find({ isActive: true });
 
       for (const tenant of tenants) {
         // Find low stock products
@@ -54,27 +52,39 @@ class StockMonitorJob {
         for (const product of lowStockProducts) {
           const isOutOfStock = product.stock.quantity <= 0;
 
-          // Send alert to vendor (if not already sent)
-          if (vendor && tenant.whatsapp?.enabled && tenant.whatsapp?.notifications?.lowStockAlert) {
-            if (
-              (isOutOfStock && !product.outOfStockAlertSent) ||
-              (!isOutOfStock && !product.lowStockAlertSent)
-            ) {
+          // Send in-app notification (if not already sent)
+          if (
+            (isOutOfStock && !product.outOfStockAlertSent) ||
+            (!isOutOfStock && !product.lowStockAlertSent)
+          ) {
+            // In-app notification (always fires)
+            try {
+              if (isOutOfStock) {
+                await NotificationService.onOutOfStock(tenant._id, product);
+              } else {
+                await NotificationService.onLowStock(tenant._id, product);
+              }
+            } catch (err) {
+              logger.error(`Stock notification failed: ${err.message}`);
+            }
+
+            // WhatsApp alert (if enabled)
+            if (vendor && tenant.whatsapp?.enabled && tenant.whatsapp?.notifications?.lowStockAlert) {
               try {
                 await WhatsAppService.sendLowStockAlert(
                   vendor.phone,
                   product,
                   isOutOfStock
                 );
-
-                if (isOutOfStock) {
-                  product.outOfStockAlertSent = true;
-                } else {
-                  product.lowStockAlertSent = true;
-                }
               } catch (err) {
                 logger.error(`Stock alert WhatsApp failed: ${err.message}`);
               }
+            }
+
+            if (isOutOfStock) {
+              product.outOfStockAlertSent = true;
+            } else {
+              product.lowStockAlertSent = true;
             }
           }
 

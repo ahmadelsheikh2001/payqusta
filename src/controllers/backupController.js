@@ -240,6 +240,176 @@ class BackupController {
       next(error);
     }
   }
+  /**
+   * GET /api/v1/backup/export-json
+   * Export all tenant data as JSON file (full backup)
+   */
+  async exportJSON(req, res, next) {
+    try {
+      const tenantId = req.tenantId;
+
+      const [products, customers, suppliers, invoices, expenses] = await Promise.all([
+        Product.find({ tenant: tenantId }).lean(),
+        Customer.find({ tenant: tenantId }).lean(),
+        Supplier.find({ tenant: tenantId }).lean(),
+        Invoice.find({ tenant: tenantId }).populate('customer', 'name phone').lean(),
+        Expense.find({ tenant: tenantId }).lean(),
+      ]);
+
+      // Remove internal fields that shouldn't be in backup
+      const clean = (docs) => docs.map(d => {
+        const { __v, ...rest } = d;
+        return rest;
+      });
+
+      const backup = {
+        version: '1.0',
+        appName: 'PayQusta',
+        exportedAt: new Date().toISOString(),
+        tenant: tenantId,
+        counts: {
+          products: products.length,
+          customers: customers.length,
+          suppliers: suppliers.length,
+          invoices: invoices.length,
+          expenses: expenses.length,
+          total: products.length + customers.length + suppliers.length + invoices.length + expenses.length,
+        },
+        data: {
+          products: clean(products),
+          customers: clean(customers),
+          suppliers: clean(suppliers),
+          invoices: clean(invoices),
+          expenses: clean(expenses),
+        },
+      };
+
+      const fileName = `PayQusta_Backup_${new Date().toISOString().slice(0, 10)}.json`;
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+      res.send(JSON.stringify(backup, null, 2));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * POST /api/v1/backup/restore-json
+   * Restore data from JSON backup file
+   */
+  async restoreJSON(req, res, next) {
+    try {
+      if (!req.file) return next(AppError.badRequest('يرجى رفع ملف النسخة الاحتياطية'));
+
+      const fs = require('fs');
+      const raw = fs.readFileSync(req.file.path, 'utf-8');
+      fs.unlink(req.file.path, () => {});
+
+      let backup;
+      try {
+        backup = JSON.parse(raw);
+      } catch {
+        return next(AppError.badRequest('ملف JSON غير صالح'));
+      }
+
+      if (!backup.data || !backup.appName) {
+        return next(AppError.badRequest('ملف النسخة الاحتياطية غير صالح - يجب أن يكون ملف PayQusta'));
+      }
+
+      const tenantId = req.tenantId;
+      const results = {
+        products: { imported: 0, skipped: 0 },
+        customers: { imported: 0, skipped: 0 },
+        suppliers: { imported: 0, skipped: 0 },
+        invoices: { imported: 0, skipped: 0 },
+        expenses: { imported: 0, skipped: 0 },
+      };
+
+      // Restore Products
+      if (backup.data.products?.length) {
+        for (const p of backup.data.products) {
+          const existing = await Product.findOne({ tenant: tenantId, name: p.name });
+          if (existing) { results.products.skipped++; continue; }
+          await Product.create({
+            ...p, _id: undefined, tenant: tenantId,
+          });
+          results.products.imported++;
+        }
+      }
+
+      // Restore Customers
+      if (backup.data.customers?.length) {
+        for (const c of backup.data.customers) {
+          const existing = await Customer.findOne({ tenant: tenantId, phone: c.phone });
+          if (existing) { results.customers.skipped++; continue; }
+          await Customer.create({
+            ...c, _id: undefined, tenant: tenantId,
+          });
+          results.customers.imported++;
+        }
+      }
+
+      // Restore Suppliers
+      if (backup.data.suppliers?.length) {
+        for (const s of backup.data.suppliers) {
+          const existing = await Supplier.findOne({ tenant: tenantId, name: s.name });
+          if (existing) { results.suppliers.skipped++; continue; }
+          await Supplier.create({
+            ...s, _id: undefined, tenant: tenantId,
+          });
+          results.suppliers.imported++;
+        }
+      }
+
+      // Restore Invoices
+      if (backup.data.invoices?.length) {
+        for (const inv of backup.data.invoices) {
+          const existing = await Invoice.findOne({ tenant: tenantId, invoiceNumber: inv.invoiceNumber });
+          if (existing) { results.invoices.skipped++; continue; }
+          // Link customer by name/phone if possible
+          let customerId = null;
+          if (inv.customer?.name) {
+            const cust = await Customer.findOne({ tenant: tenantId, name: inv.customer.name });
+            if (cust) customerId = cust._id;
+          }
+          await Invoice.create({
+            ...inv, _id: undefined, tenant: tenantId,
+            customer: customerId || inv.customer?._id || inv.customer,
+          });
+          results.invoices.imported++;
+        }
+      }
+
+      // Restore Expenses
+      if (backup.data.expenses?.length) {
+        for (const e of backup.data.expenses) {
+          const existing = await Expense.findOne({
+            tenant: tenantId,
+            description: e.description,
+            amount: e.amount,
+            date: e.date,
+          });
+          if (existing) { results.expenses.skipped++; continue; }
+          await Expense.create({
+            ...e, _id: undefined, tenant: tenantId,
+          });
+          results.expenses.imported++;
+        }
+      }
+
+      const totalImported = Object.values(results).reduce((sum, r) => sum + r.imported, 0);
+      const totalSkipped = Object.values(results).reduce((sum, r) => sum + r.skipped, 0);
+
+      ApiResponse.success(res, {
+        ...results,
+        totalImported,
+        totalSkipped,
+      }, `تم استعادة ${totalImported} سجل بنجاح (تم تخطي ${totalSkipped} مكرر)`);
+    } catch (error) {
+      if (req.file?.path) require('fs').unlink(req.file.path, () => {});
+      next(error);
+    }
+  }
 }
 
 module.exports = new BackupController();

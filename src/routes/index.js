@@ -229,8 +229,19 @@ router.get('/import/template/:type', authorize('vendor', 'admin'), importControl
 
 // ============ BACKUP ROUTES ============
 router.get('/backup/export', authorize('vendor', 'admin'), backupController.exportData);
+router.get('/backup/export-json', authorize('vendor', 'admin'), backupController.exportJSON);
 router.get('/backup/stats', authorize('vendor', 'admin'), backupController.getStats);
 router.post('/backup/restore', authorize('vendor', 'admin'), importUpload.single('file'), auditLog('restore', 'backup'), backupController.restoreData);
+
+const backupUpload = multer({
+  dest: 'uploads/imports/',
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB for JSON
+  fileFilter: (req, file, cb) => {
+    const ext = require('path').extname(file.originalname).toLowerCase();
+    cb(null, ext === '.json');
+  },
+});
+router.post('/backup/restore-json', authorize('vendor', 'admin'), backupUpload.single('file'), auditLog('restore', 'backup'), backupController.restoreJSON);
 
 // ============ BULK OPERATIONS ============
 router.post('/products/bulk-delete', authorize('vendor', 'admin'), auditLog('bulk_delete', 'product'), async (req, res, next) => {

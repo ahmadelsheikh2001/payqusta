@@ -115,25 +115,76 @@ productSchema.pre('save', function (next) {
   next();
 });
 
-// Static: Find low stock products for a tenant
-productSchema.statics.findLowStock = function (tenantId) {
-  return this.find({
-    tenant: tenantId,
-    isActive: true,
-    $or: [
-      { stockStatus: STOCK_STATUS.LOW_STOCK },
-      { stockStatus: STOCK_STATUS.OUT_OF_STOCK },
-    ],
-  }).populate('supplier', 'name contactPerson phone');
+// Post-findOneAndUpdate: Sync stockStatus when stock is modified via update queries
+productSchema.post('findOneAndUpdate', async function (doc) {
+  if (!doc) return;
+  let newStatus;
+  if (doc.stock.quantity <= 0) {
+    newStatus = STOCK_STATUS.OUT_OF_STOCK;
+  } else if (doc.stock.quantity <= doc.stock.minQuantity) {
+    newStatus = STOCK_STATUS.LOW_STOCK;
+  } else {
+    newStatus = STOCK_STATUS.IN_STOCK;
+  }
+  if (doc.stockStatus !== newStatus) {
+    doc.stockStatus = newStatus;
+    if (newStatus === STOCK_STATUS.IN_STOCK) {
+      doc.lowStockAlertSent = false;
+      doc.outOfStockAlertSent = false;
+    }
+    await doc.save();
+  }
+});
+
+// Static: Find low stock products for a tenant (uses aggregation for reliable field-to-field comparison)
+productSchema.statics.findLowStock = async function (tenantId) {
+  // Step 1: Aggregation pipeline to find products where quantity <= minQuantity
+  const matched = await this.aggregate([
+    {
+      $match: {
+        tenant: new mongoose.Types.ObjectId(tenantId),
+        isActive: true,
+      },
+    },
+    {
+      $match: {
+        $expr: { $lte: ['$stock.quantity', '$stock.minQuantity'] },
+      },
+    },
+    { $project: { _id: 1 } },
+  ]);
+
+  if (matched.length === 0) return [];
+
+  // Step 2: Fetch as Mongoose documents with populate (needed for .save() in StockMonitorJob)
+  return this.find({ _id: { $in: matched.map((p) => p._id) } })
+    .populate('supplier', 'name contactPerson phone');
 };
 
-// Static: Get stock summary for a tenant
+// Static: Get stock summary for a tenant (compute status from actual quantities)
 productSchema.statics.getStockSummary = async function (tenantId) {
   const result = await this.aggregate([
     { $match: { tenant: new mongoose.Types.ObjectId(tenantId), isActive: true } },
     {
+      $addFields: {
+        computedStatus: {
+          $cond: {
+            if: { $lte: ['$stock.quantity', 0] },
+            then: 'out_of_stock',
+            else: {
+              $cond: {
+                if: { $lte: ['$stock.quantity', '$stock.minQuantity'] },
+                then: 'low_stock',
+                else: 'in_stock',
+              },
+            },
+          },
+        },
+      },
+    },
+    {
       $group: {
-        _id: '$stockStatus',
+        _id: '$computedStatus',
         count: { $sum: 1 },
         totalValue: { $sum: { $multiply: ['$stock.quantity', '$cost'] } },
       },

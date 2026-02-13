@@ -28,7 +28,6 @@ import AdminTenantsPage from './pages/AdminTenantsPage';
 import AdminUsersPage from './pages/AdminUsersPage';
 import AdminAuditLogsPage from './pages/AdminAuditLogsPage';
 import AdminStatisticsPage from './pages/AdminStatisticsPage';
-import UserProfilePage from './pages/UserProfilePage';
 import ImportDataPage from './pages/ImportDataPage';
 import BackupRestorePage from './pages/BackupRestorePage';
 
@@ -96,7 +95,6 @@ function MainLayout() {
               <Route path="/business-reports" element={<BusinessReportsPage />} />
               <Route path="/aging-report" element={<AgingReportPage />} />
               <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/profile" element={<UserProfilePage />} />
               <Route path="/import" element={<ImportDataPage />} />
               <Route path="/backup" element={<BackupRestorePage />} />
               <Route path="*" element={<Navigate to="/" replace />} />

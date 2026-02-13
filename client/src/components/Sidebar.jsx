@@ -5,7 +5,7 @@ import {
   Settings, LogOut, X, Zap, BarChart3, Target, Receipt,
   AlertTriangle, ChevronDown, ChevronLeft, Boxes, Clock,
   PieChart, TrendingUp, Crown, Building2, Shield, Activity,
-  Upload, Database, UserCircle,
+  Upload, Database,
 } from 'lucide-react';
 import { useAuthStore } from '../store';
 
@@ -205,7 +205,6 @@ export default function Sidebar({ open, onClose }) {
           </div>
         </div>
 
-        <NavItem to="/profile" icon={UserCircle} label="الملف الشخصي" />
         <NavItem to="/settings" icon={Settings} label="الإعدادات" />
       </nav>
 

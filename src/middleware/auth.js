@@ -46,7 +46,7 @@ const protect = async (req, res, next) => {
 
     // Attach user and tenant to request
     req.user = user;
-    req.tenantId = decoded.tenant;
+    req.tenantId = decoded.tenant || user.tenant;
 
     next();
   } catch (error) {
@@ -85,7 +85,8 @@ const tenantScope = (req, res, next) => {
   }
 
   // Attach tenant filter helper
-  req.tenantFilter = req.user.role === 'admin' ? {} : { tenant: req.tenantId };
+  // Admin with a tenant gets scoped too; admin without tenant gets global access
+  req.tenantFilter = req.tenantId ? { tenant: req.tenantId } : {};
 
   next();
 };

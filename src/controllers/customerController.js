@@ -57,9 +57,14 @@ class CustomerController {
 
   async create(req, res, next) {
     try {
+      const tenantId = req.tenantId || req.body.tenantId;
+      if (!tenantId) {
+        return next(AppError.badRequest('يجب تحديد المتجر لإضافة عميل'));
+      }
+
       const customerData = {
         ...req.body,
-        tenant: req.tenantId,
+        tenant: tenantId,
         whatsapp: {
           enabled: true,
           number: Helpers.formatPhoneForWhatsApp(req.body.phone),
