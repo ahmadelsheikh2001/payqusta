@@ -52,9 +52,11 @@ export default function SettingsPage() {
   const [testingWhatsApp, setTestingWhatsApp] = useState(false);
   const [whatsappStatus, setWhatsappStatus] = useState(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const initializedRef = useRef(false);
 
-  // Load initial data
+  // Load initial data — only once when tenant/user first become available
   useEffect(() => {
+    if (initializedRef.current) return;
     if (tenant) {
       setStoreForm({
         name: tenant.name || '',
@@ -83,6 +85,9 @@ export default function SettingsPage() {
     if (user) {
       setUserForm({ name: user.name || '', email: user.email || '', phone: user.phone || '' });
     }
+    if (tenant && user) {
+      initializedRef.current = true;
+    }
     loadCategories();
   }, [tenant, user]);
 
@@ -100,7 +105,7 @@ export default function SettingsPage() {
     if (!storeForm.name) return notify.error('اسم المتجر مطلوب');
     setSaving({ ...saving, store: true });
     try {
-      await api.put('/settings/store', storeForm);
+      await api.put('/settings/store', { name: storeForm.name, businessInfo: { email: storeForm.email, phone: storeForm.phone, address: storeForm.address } });
       notify.success('تم حفظ بيانات المتجر');
       getMe();
     } catch (err) {
@@ -167,6 +172,7 @@ export default function SettingsPage() {
       } else {
         notify.success('تم حفظ الإعدادات');
       }
+      // Don't re-initialize form from server — keep user's current values
       getMe();
     } catch (err) {
       notify.error(err.response?.data?.message || 'خطأ في الحفظ');
