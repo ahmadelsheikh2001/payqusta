@@ -126,10 +126,15 @@ class AuthController {
         }).catch(() => {});
       }
 
+      // Get user permissions
+      const { getUserPermissions } = require('../middleware/checkPermission');
+      const permissions = await getUserPermissions(user);
+
       ApiResponse.success(res, {
         token,
         user: Helpers.sanitizeUser(user),
         tenant: user.tenant,
+        permissions,
       }, 'تم تسجيل الدخول بنجاح');
     } catch (error) {
       next(error);
@@ -142,11 +147,18 @@ class AuthController {
    */
   async getMe(req, res, next) {
     try {
-      const user = await User.findById(req.user._id).populate('tenant', 'name slug branding settings subscription');
+      const user = await User.findById(req.user._id)
+        .populate('tenant', 'name slug branding settings subscription')
+        .populate('customRole');
+
+      // Get user permissions
+      const { getUserPermissions } = require('../middleware/checkPermission');
+      const permissions = await getUserPermissions(user);
 
       ApiResponse.success(res, {
         user: Helpers.sanitizeUser(user),
         tenant: user.tenant,
+        permissions,
       });
     } catch (error) {
       next(error);
@@ -341,16 +353,22 @@ class AuthController {
       const { name, email, phone, password, role } = req.body;
 
       // Validate role
-      const allowedRoles = ['supplier', 'coordinator', 'customer'];
+      const allowedRoles = ['vendor', 'coordinator', 'supplier', 'customer'];
       if (!allowedRoles.includes(role)) {
         return next(AppError.badRequest('الدور غير مسموح به'));
+      }
+
+      // Check if email exists in this tenant
+      const existing = await User.findOne({ email, tenant: req.tenantId });
+      if (existing) {
+        return next(AppError.badRequest('البريد الإلكتروني موجود بالفعل في هذا المتجر'));
       }
 
       const user = await User.create({
         name,
         email,
         phone,
-        password: password || Helpers.generatePassword(),
+        password: password || '123456', // Default password if not provided
         role,
         tenant: req.tenantId,
       });
@@ -358,6 +376,89 @@ class AuthController {
       ApiResponse.created(res, {
         user: Helpers.sanitizeUser(user),
       }, 'تم إضافة المستخدم بنجاح');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/v1/auth/users
+   * Get all users for the current tenant
+   */
+  async getTenantUsers(req, res, next) {
+    try {
+      const { page, limit, skip } = Helpers.getPaginationParams(req.query);
+      const filter = { 
+        tenant: req.tenantId,
+        _id: { $ne: req.user._id } // Exclude current user
+      };
+
+      if (req.query.search) {
+        filter.$or = [
+          { name: { $regex: req.query.search, $options: 'i' } },
+          { email: { $regex: req.query.search, $options: 'i' } },
+          { phone: { $regex: req.query.search, $options: 'i' } },
+        ];
+      }
+
+      const [users, total] = await Promise.all([
+        User.find(filter)
+          .sort('-createdAt')
+          .skip(skip)
+          .limit(limit)
+          .select('-password'),
+        User.countDocuments(filter),
+      ]);
+
+      ApiResponse.paginated(res, users, { page, limit, total });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * PUT /api/v1/auth/users/:id
+   * Update a user in the current tenant
+   */
+  async updateTenantUser(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { name, phone, role, password, isActive } = req.body;
+
+      const user = await User.findOne({ _id: id, tenant: req.tenantId });
+      if (!user) return next(AppError.notFound('المستخدم غير موجود'));
+
+      if (name) user.name = name;
+      if (phone) user.phone = phone;
+      if (role) user.role = role;
+      if (typeof isActive === 'boolean') user.isActive = isActive;
+      if (password) user.password = password;
+
+      await user.save();
+
+      ApiResponse.success(res, { user: Helpers.sanitizeUser(user) }, 'تم تحديث البيانات بنجاح');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * DELETE /api/v1/auth/users/:id
+   * Deactivate a user in the current tenant
+   */
+  async deleteTenantUser(req, res, next) {
+    try {
+      const { id } = req.params;
+
+      const user = await User.findOne({ _id: id, tenant: req.tenantId });
+      if (!user) return next(AppError.notFound('المستخدم غير موجود'));
+
+      // Prevent deleting the last vendor/admin? 
+      // For now just soft delete
+      user.isActive = false;
+      await user.save({ validateBeforeSave: false });
+
+      ApiResponse.success(res, null, 'تم تعطيل المستخدم');
     } catch (error) {
       next(error);
     }

@@ -5,7 +5,7 @@ import {
   Settings, LogOut, X, Zap, BarChart3, Target, Receipt,
   AlertTriangle, ChevronDown, ChevronLeft, Boxes, Clock,
   PieChart, TrendingUp, Crown, Building2, Shield, Activity,
-  Upload, Database,
+  Upload, Database, Archive, DollarSign, ShoppingCart,
 } from 'lucide-react';
 import { useAuthStore } from '../store';
 
@@ -160,6 +160,7 @@ export default function Sidebar({ open, onClose }) {
           <div className={`overflow-hidden transition-all duration-200 ${productsOpen ? 'max-h-40 mt-1' : 'max-h-0'}`}>
             <div className="space-y-1 py-1">
               <SubNavItem to="/products" icon={Boxes} label="كل المنتجات" />
+              <SubNavItem to="/stock-adjustments" icon={Archive} label="تسوية المخزون" />
               <SubNavItem to="/low-stock" icon={AlertTriangle} label="نقص المخزون" />
             </div>
           </div>
@@ -199,6 +200,9 @@ export default function Sidebar({ open, onClose }) {
           />
           <div className={`overflow-hidden transition-all duration-200 ${toolsOpen ? 'max-h-40 mt-1' : 'max-h-0'}`}>
             <div className="space-y-1 py-1">
+              <SubNavItem to="/cash-drawer" icon={DollarSign} label="إدارة الخزينة" />
+              <SubNavItem to="/roles" icon={Shield} label="الأدوار والصلاحيات" />
+              <SubNavItem to="/activity-logs" icon={Activity} label="سجل الأنشطة" />
               <SubNavItem to="/import" icon={Upload} label="استيراد البيانات" />
               <SubNavItem to="/backup" icon={Database} label="النسخ الاحتياطي" />
             </div>

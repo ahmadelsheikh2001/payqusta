@@ -110,6 +110,7 @@ export default function AdminUsersPage() {
           phone: form.phone,
           role: form.role,
           isActive: form.isActive,
+          ...(form.password ? { password: form.password } : {}),
         });
         toast.success('تم تحديث المستخدم ✅');
         setShowModal(false);
@@ -404,6 +405,16 @@ export default function AdminUsersPage() {
                     <option value="active">نشط</option>
                     <option value="inactive">معطل</option>
                   </select>
+                </div>
+                <div className="pt-2 border-t border-gray-100 dark:border-gray-700 mt-2">
+                  <label className="block text-sm font-bold mb-2 text-amber-600">تعيين كلمة مرور جديدة (اختياري)</label>
+                  <Input
+                    type="password"
+                    placeholder="أدخل كلمة مرور جديدة..."
+                    value={form.password || ''}
+                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  />
+                  <p className="text-xs text-gray-400 mt-1">اتركه فارغاً إذا كنت لا تريد تغيير كلمة المرور</p>
                 </div>
               </>
             ) : (

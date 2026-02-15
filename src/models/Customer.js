@@ -90,6 +90,12 @@ const customerSchema = new mongoose.Schema(
     whatsapp: {
       enabled: { type: Boolean, default: true },
       number: { type: String }, // Formatted for WhatsApp
+      notifications: {
+        invoices: { type: Boolean, default: true },      // إشعار الفواتير الجديدة
+        reminders: { type: Boolean, default: true },     // تذكيرات الأقساط
+        statements: { type: Boolean, default: true },    // كشف الحساب
+        payments: { type: Boolean, default: true },      // تأكيد استلام الدفع
+      },
     },
     // Notes
     notes: { type: String, maxlength: 2000 },

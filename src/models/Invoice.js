@@ -22,6 +22,8 @@ const invoiceItemSchema = new mongoose.Schema({
   quantity: { type: Number, required: true, min: 1 },
   unitPrice: { type: Number, required: true, min: 0 },
   totalPrice: { type: Number, required: true },
+  taxable: { type: Boolean, default: true },
+  taxRate: { type: Number, default: 0 },
 });
 
 // Installment schedule item
@@ -78,8 +80,9 @@ const invoiceSchema = new mongoose.Schema(
     },
     // Items
     items: [invoiceItemSchema],
-    // Totals (NO TAX)
+    // Totals
     subtotal: { type: Number, required: true },
+    taxAmount: { type: Number, default: 0 },
     discount: { type: Number, default: 0 },
     totalAmount: { type: Number, required: true },
     // Payment

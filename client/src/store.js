@@ -80,17 +80,64 @@ export const useAuthStore = create((set, get) => ({
   },
 
   getMe: async () => {
+    // Return existing promise if request is already in flight
+    if (get().loadingUser) return;
+    
+    set({ loadingUser: true });
     try {
       const { data } = await api.get('/auth/me');
-      set({ user: data.data.user, tenant: data.data.tenant });
+      set({ user: data.data.user, tenant: data.data.tenant, loadingUser: false });
     } catch (error) {
-      set({ isAuthenticated: false, user: null });
+      set({ isAuthenticated: false, user: null, loadingUser: false });
     }
   },
 
   logout: () => {
     localStorage.removeItem('payqusta_token');
     set({ user: null, tenant: null, token: null, isAuthenticated: false });
+  },
+
+  // --- Multi-Branch Actions ---
+  switchTenant: async (tenantId) => {
+    set({ loading: true });
+    try {
+      const { data } = await api.post('/auth/switch-tenant', { tenantId });
+      localStorage.setItem('payqusta_token', data.data.token);
+      
+      // Reload user with new token
+      const meRes = await api.get('/auth/me');
+      set({ 
+        token: data.data.token,
+        user: meRes.data.data.user, 
+        tenant: meRes.data.data.tenant,
+        loading: false 
+      });
+      window.location.href = '/'; // Refresh to clear any stale state
+    } catch (error) {
+      set({ loading: false });
+      throw error.response?.data || error;
+    }
+  },
+
+  getBranches: async () => {
+    try {
+      const { data } = await api.get('/tenants/my-branches');
+      return data.data;
+    } catch (error) {
+      return [];
+    }
+  },
+
+  createBranch: async (data) => {
+    set({ loading: true });
+    try {
+      const res = await api.post('/tenants/branch', data);
+      set({ loading: false });
+      return res.data;
+    } catch (error) {
+      set({ loading: false });
+      throw error.response?.data || error;
+    }
   },
 }));
 
@@ -141,6 +188,7 @@ export const customersApi = {
   getStatementPDF: (id) => api.get(`/customers/${id}/statement-pdf`),
   sendStatement: (id) => api.post(`/customers/${id}/send-statement`),
   sendStatementPDF: (id) => api.post(`/customers/${id}/send-statement-pdf`),
+  updateWhatsAppPreferences: (id, data) => api.put(`/customers/${id}/whatsapp-preferences`, data),
 };
 
 // Invoices API

@@ -65,6 +65,10 @@ class CustomerController {
       const customerData = {
         ...req.body,
         tenant: tenantId,
+        financials: {
+          ...req.body.financials,
+          creditLimit: req.body.creditLimit !== undefined ? req.body.creditLimit : (req.body.financials?.creditLimit || 10000),
+        },
         whatsapp: {
           enabled: true,
           number: Helpers.formatPhoneForWhatsApp(req.body.phone),
@@ -84,8 +88,24 @@ class CustomerController {
       const updateData = {};
       allowedFields.forEach((f) => { if (req.body[f] !== undefined) updateData[f] = req.body[f]; });
 
+      if (req.body.creditLimit !== undefined) {
+        updateData['financials.creditLimit'] = req.body.creditLimit;
+      }
+
       if (req.body.phone) {
         updateData['whatsapp.number'] = Helpers.formatPhoneForWhatsApp(req.body.phone);
+      }
+
+      // WhatsApp notification preferences
+      if (req.body.whatsapp !== undefined) {
+        if (req.body.whatsapp.enabled !== undefined) updateData['whatsapp.enabled'] = req.body.whatsapp.enabled;
+        if (req.body.whatsapp.notifications) {
+          const n = req.body.whatsapp.notifications;
+          if (n.invoices !== undefined) updateData['whatsapp.notifications.invoices'] = n.invoices;
+          if (n.reminders !== undefined) updateData['whatsapp.notifications.reminders'] = n.reminders;
+          if (n.statements !== undefined) updateData['whatsapp.notifications.statements'] = n.statements;
+          if (n.payments !== undefined) updateData['whatsapp.notifications.payments'] = n.payments;
+        }
       }
 
       const customer = await Customer.findOneAndUpdate(
@@ -415,6 +435,11 @@ class CustomerController {
       if (!customer) return next(AppError.notFound('العميل غير موجود'));
       if (!customer.phone) return next(AppError.badRequest('العميل ليس لديه رقم هاتف'));
 
+      // Check if customer has WhatsApp statements disabled
+      if (customer.whatsapp?.enabled === false || customer.whatsapp?.notifications?.statements === false) {
+        return next(AppError.badRequest('إشعارات WhatsApp معطلة لهذا العميل'));
+      }
+
       const tenant = await Tenant.findById(req.tenantId);
 
       const invoices = await Invoice.find({ customer: customer._id })
@@ -490,6 +515,38 @@ class CustomerController {
         whatsappSent: whatsappResult.success,
         method: whatsappResult.success ? 'document' : 'text',
       }, whatsappResult.success ? 'تم إرسال كشف الحساب PDF عبر WhatsApp ✅' : 'تم إنشاء PDF وإرسال ملخص نصي');
+    } catch (error) {
+      next(error);
+    }
+  }
+  /**
+   * PUT /api/v1/customers/:id/whatsapp-preferences
+   * Update customer WhatsApp notification preferences
+   */
+  async updateWhatsAppPreferences(req, res, next) {
+    try {
+      const { enabled, notifications } = req.body;
+
+      const updateData = {};
+      if (enabled !== undefined) updateData['whatsapp.enabled'] = enabled;
+      if (notifications) {
+        if (notifications.invoices !== undefined) updateData['whatsapp.notifications.invoices'] = notifications.invoices;
+        if (notifications.reminders !== undefined) updateData['whatsapp.notifications.reminders'] = notifications.reminders;
+        if (notifications.statements !== undefined) updateData['whatsapp.notifications.statements'] = notifications.statements;
+        if (notifications.payments !== undefined) updateData['whatsapp.notifications.payments'] = notifications.payments;
+      }
+
+      const customer = await Customer.findOneAndUpdate(
+        { _id: req.params.id, ...req.tenantFilter },
+        { $set: updateData },
+        { new: true }
+      );
+
+      if (!customer) return next(AppError.notFound('العميل غير موجود'));
+
+      ApiResponse.success(res, {
+        whatsapp: customer.whatsapp,
+      }, 'تم تحديث إعدادات WhatsApp للعميل');
     } catch (error) {
       next(error);
     }

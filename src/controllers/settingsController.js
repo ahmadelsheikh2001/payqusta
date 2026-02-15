@@ -29,6 +29,7 @@ class SettingsController {
           settings: tenant.settings,
           branding: tenant.branding,
           subscription: tenant.subscription,
+          whatsapp: tenant.whatsapp,
         },
         user: {
           _id: user._id,
@@ -74,7 +75,7 @@ class SettingsController {
    */
   async updateWhatsApp(req, res, next) {
     try {
-      const { whatsappNumber, whatsappToken, whatsappPhoneId, notifications } = req.body;
+      const { whatsappNumber, whatsappToken, whatsappPhoneId, wabaId, notifications, templateNames, templateLanguages } = req.body;
 
       const updateData = {
         'whatsapp.enabled': !!(whatsappToken && whatsappPhoneId),
@@ -87,6 +88,29 @@ class SettingsController {
         'whatsapp.notifications.supplierPaymentDue': notifications?.supplierReminder ?? true,
       };
 
+      // Save WABA ID if provided
+      if (wabaId !== undefined) {
+        updateData['whatsapp.wabaId'] = wabaId;
+      }
+
+      // Save template name mappings if provided
+      if (templateNames) {
+        for (const [purpose, name] of Object.entries(templateNames)) {
+          if (['invoice', 'statement', 'reminder', 'payment', 'restock'].includes(purpose)) {
+            updateData[`whatsapp.templateNames.${purpose}`] = name;
+          }
+        }
+      }
+
+      // Save template language mappings if provided
+      if (templateLanguages) {
+        for (const [purpose, lang] of Object.entries(templateLanguages)) {
+          if (['invoice', 'statement', 'reminder', 'payment', 'restock'].includes(purpose)) {
+            updateData[`whatsapp.templateLanguages.${purpose}`] = lang;
+          }
+        }
+      }
+
       const tenant = await Tenant.findByIdAndUpdate(
         req.tenantId,
         { $set: updateData },
@@ -98,6 +122,7 @@ class SettingsController {
       // Update environment variables in memory for immediate effect
       if (whatsappToken) process.env.WHATSAPP_ACCESS_TOKEN = whatsappToken;
       if (whatsappPhoneId) process.env.WHATSAPP_PHONE_NUMBER_ID = whatsappPhoneId;
+      if (wabaId) process.env.WABA_ID = wabaId;
 
       // Force WhatsApp service to reload credentials
       const WhatsAppService = require('../services/WhatsAppService');
@@ -105,7 +130,7 @@ class SettingsController {
         WhatsAppService.refreshCredentials();
       }
 
-      ApiResponse.success(res, { 
+      ApiResponse.success(res, {
         whatsapp: tenant.whatsapp,
         configured: !!(whatsappToken && whatsappPhoneId),
       }, 'تم تحديث إعدادات WhatsApp بنجاح');
@@ -248,7 +273,7 @@ class SettingsController {
 
   /**
    * GET /api/v1/settings/whatsapp/templates
-   * Check WhatsApp Templates status
+   * Get all WhatsApp Templates from Meta account
    */
   async checkWhatsAppTemplates(req, res, next) {
     try {
@@ -260,14 +285,132 @@ class SettingsController {
           success: false,
           configured: false,
           message: 'WhatsApp غير مُهيأ. يرجى إدخال Access Token و Phone Number ID في الإعدادات',
-          instructions: 'اذهب إلى الإعدادات → WhatsApp → أدخل Phone Number ID و Access Token',
         }, 'WhatsApp غير مُهيأ');
       }
 
-      // Get template status
-      const result = await WhatsAppService.checkTemplateStatus();
+      // Get tenant whatsapp config for dynamic WABA_ID and template names
+      const tenant = await Tenant.findById(req.tenantId);
+      const tenantWhatsapp = tenant?.whatsapp;
+      const wabaId = tenantWhatsapp?.wabaId || process.env.WABA_ID;
 
-      ApiResponse.success(res, result, 'تم التحقق من حالة القوالب');
+      // Fetch real templates from Meta
+      const result = await WhatsAppService.getTemplates(wabaId, tenantWhatsapp);
+
+      if (result.success) {
+        ApiResponse.success(res, result, `تم جلب ${result.totalOnAccount} قالب من WABA ${result.wabaId}`);
+      } else {
+        ApiResponse.success(res, result, result.message || 'فشل جلب القوالب');
+      }
+    } catch (error) {
+      next(error);
+    }
+  }
+  /**
+   * POST /api/v1/settings/whatsapp/create-templates
+   * Create all required WhatsApp templates on Meta
+   */
+  async createWhatsAppTemplates(req, res, next) {
+    try {
+      const WhatsAppService = require('../services/WhatsAppService');
+
+      if (!WhatsAppService.isConfigured()) {
+        return ApiResponse.success(res, {
+          success: false,
+          configured: false,
+          message: 'WhatsApp غير مُهيأ',
+        }, 'WhatsApp غير مُهيأ');
+      }
+
+      const tenant = await Tenant.findById(req.tenantId);
+      const wabaId = tenant?.whatsapp?.wabaId || process.env.WABA_ID;
+
+      const result = await WhatsAppService.createAllTemplates(wabaId);
+      ApiResponse.success(res, result, `تم إنشاء ${result.created} قالب من ${result.created + result.failed}`);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * POST /api/v1/settings/whatsapp/detect-templates
+   * Auto-detect templates from a WABA and return mapping
+   */
+  async detectTemplates(req, res, next) {
+    try {
+      const WhatsAppService = require('../services/WhatsAppService');
+
+      if (!WhatsAppService.isConfigured()) {
+        return ApiResponse.success(res, {
+          success: false,
+          configured: false,
+          message: 'WhatsApp غير مُهيأ',
+        }, 'WhatsApp غير مُهيأ');
+      }
+
+      const { wabaId } = req.body;
+      const tenant = await Tenant.findById(req.tenantId);
+      const targetWabaId = wabaId || tenant?.whatsapp?.wabaId || process.env.WABA_ID;
+
+      if (!targetWabaId) {
+        return ApiResponse.success(res, {
+          success: false,
+          message: 'WABA_ID مطلوب — أضفه في حقل WABA ID أو .env',
+        }, 'WABA_ID مطلوب');
+      }
+
+      const result = await WhatsAppService.autoDetectTemplates(targetWabaId);
+
+      if (result.success) {
+        ApiResponse.success(res, result, `تم جلب ${result.totalTemplates} قالب — ${result.approvedCount} معتمد`);
+      } else {
+        ApiResponse.success(res, result, result.message || 'فشل جلب القوالب');
+      }
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * POST /api/v1/settings/whatsapp/apply-templates
+   * Apply auto-detected template mapping to tenant settings
+   */
+  async applyTemplateMapping(req, res, next) {
+    try {
+      const { wabaId, templateNames, templateLanguages } = req.body;
+
+      const updateData = {};
+      if (wabaId) updateData['whatsapp.wabaId'] = wabaId;
+
+      if (templateNames) {
+        for (const [purpose, name] of Object.entries(templateNames)) {
+          if (['invoice', 'statement', 'reminder', 'payment', 'restock'].includes(purpose)) {
+            updateData[`whatsapp.templateNames.${purpose}`] = name;
+          }
+        }
+      }
+
+      if (templateLanguages) {
+        for (const [purpose, lang] of Object.entries(templateLanguages)) {
+          if (['invoice', 'statement', 'reminder', 'payment', 'restock'].includes(purpose)) {
+            updateData[`whatsapp.templateLanguages.${purpose}`] = lang;
+          }
+        }
+      }
+
+      const tenant = await Tenant.findByIdAndUpdate(
+        req.tenantId,
+        { $set: updateData },
+        { new: true, runValidators: true }
+      );
+
+      if (!tenant) return next(AppError.notFound('المتجر غير موجود'));
+
+      // Update env for immediate effect
+      if (wabaId) process.env.WABA_ID = wabaId;
+
+      ApiResponse.success(res, {
+        whatsapp: tenant.whatsapp,
+      }, 'تم تطبيق إعدادات القوالب بنجاح');
     } catch (error) {
       next(error);
     }

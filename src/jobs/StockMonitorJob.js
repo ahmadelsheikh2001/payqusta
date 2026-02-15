@@ -98,7 +98,8 @@ class StockMonitorJob {
               await WhatsAppService.sendRestockRequest(
                 coordinator.phone,
                 product,
-                product.autoRestock.quantity
+                product.autoRestock.quantity,
+                tenant.name
               );
 
               logger.info(

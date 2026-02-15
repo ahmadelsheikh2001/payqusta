@@ -4,7 +4,7 @@ import {
   FileText, Send, Phone, Calendar, CreditCard, TrendingUp, TrendingDown,
   ShieldAlert, ShieldCheck, Ban, CheckCircle, Clock, AlertTriangle,
   Download, History, DollarSign, ChevronDown, ChevronUp, Package,
-  RefreshCw, ChevronLeft, ChevronRight, CheckSquare, Square, XCircle, Trash2,
+  RefreshCw, ChevronLeft, ChevronRight, CheckSquare, Square, XCircle, Trash2, Bell, BellOff,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { notify } from '../components/AnimatedNotification';
@@ -22,7 +22,7 @@ export default function CustomersPage() {
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ name: '', phone: '', email: '', address: '', notes: '' });
+  const [form, setForm] = useState({ name: '', phone: '', email: '', address: '', notes: '', creditLimit: 10000 });
   
   // Customer Details Modal
   const [showDetails, setShowDetails] = useState(false);
@@ -55,11 +55,18 @@ export default function CustomersPage() {
   useEffect(() => { load(); }, [load]);
   useEffect(() => { setPage(1); }, [search, tierFilter]);
 
-  const openAdd = () => { setEditId(null); setForm({ name: '', phone: '', email: '', address: '', notes: '' }); setShowModal(true); };
+  const openAdd = () => { setEditId(null); setForm({ name: '', phone: '', email: '', address: '', notes: '', creditLimit: 10000 }); setShowModal(true); };
   const openEdit = (c, e) => {
     e?.stopPropagation();
     setEditId(c._id);
-    setForm({ name: c.name, phone: c.phone, email: c.email || '', address: c.address || '', notes: c.notes || '' });
+    setForm({ 
+      name: c.name, 
+      phone: c.phone, 
+      email: c.email || '', 
+      address: c.address || '', 
+      notes: c.notes || '',
+      creditLimit: c.financials?.creditLimit || 10000 
+    });
     setShowModal(true);
   };
 
@@ -367,6 +374,7 @@ export default function CustomersPage() {
           <Input label="رقم الهاتف *" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="01XXXXXXXXX" />
           <Input label="البريد الإلكتروني" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
           <Input label="العنوان" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+          <Input label="الحد الائتماني (ج.م)" type="number" value={form.creditLimit} onChange={(e) => setForm({ ...form, creditLimit: Number(e.target.value) })} />
         </div>
         <div className="flex justify-end gap-3 mt-6">
           <Button variant="ghost" onClick={() => setShowModal(false)}>إلغاء</Button>
@@ -410,53 +418,49 @@ export default function CustomersPage() {
               {loadingDetails ? <LoadingSpinner /> : (
                 <div className="space-y-6">
                   {/* Financial Summary */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    <Card className="p-4 border-2 border-primary-100 dark:border-primary-500/20">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-500/10 flex items-center justify-center">
-                          <DollarSign className="w-5 h-5 text-primary-500" />
+                  {/* Financial Summary */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="p-4 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 text-white shadow-lg shadow-primary-500/20">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
+                          <DollarSign className="w-4 h-4 text-white" />
                         </div>
-                        <div>
-                          <p className="text-xs text-gray-400">إجمالي المشتريات</p>
-                          <p className="text-lg font-black text-primary-600">{fmt(selectedCustomer.financials?.totalPurchases)}</p>
-                        </div>
+                        <p className="text-xs font-medium text-primary-100">المشتريات</p>
                       </div>
-                    </Card>
-                    <Card className="p-4 border-2 border-emerald-100 dark:border-emerald-500/20">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center">
-                          <TrendingUp className="w-5 h-5 text-emerald-500" />
+                      <p className="text-2xl font-black">{fmt(selectedCustomer.financials?.totalPurchases)}</p>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-sm">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center">
+                          <TrendingUp className="w-4 h-4 text-emerald-500" />
                         </div>
-                        <div>
-                          <p className="text-xs text-gray-400">إجمالي المدفوع</p>
-                          <p className="text-lg font-black text-emerald-600">{fmt(selectedCustomer.financials?.totalPaid)}</p>
-                        </div>
+                        <p className="text-xs font-medium text-gray-400">المدفوع</p>
                       </div>
-                    </Card>
-                    <Card className={`p-4 border-2 ${(selectedCustomer.financials?.outstandingBalance || 0) > 0 ? 'border-red-100 dark:border-red-500/20' : 'border-emerald-100 dark:border-emerald-500/20'}`}>
-                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${(selectedCustomer.financials?.outstandingBalance || 0) > 0 ? 'bg-red-50 dark:bg-red-500/10' : 'bg-emerald-50 dark:bg-emerald-500/10'}`}>
-                          <TrendingDown className={`w-5 h-5 ${(selectedCustomer.financials?.outstandingBalance || 0) > 0 ? 'text-red-500' : 'text-emerald-500'}`} />
+                      <p className="text-2xl font-black text-gray-900 dark:text-white">{fmt(selectedCustomer.financials?.totalPaid)}</p>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-sm">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${(selectedCustomer.financials?.outstandingBalance || 0) > 0 ? 'bg-red-50 dark:bg-red-500/10' : 'bg-emerald-50 dark:bg-emerald-500/10'}`}>
+                          <TrendingDown className={`w-4 h-4 ${(selectedCustomer.financials?.outstandingBalance || 0) > 0 ? 'text-red-500' : 'text-emerald-500'}`} />
                         </div>
-                        <div>
-                          <p className="text-xs text-gray-400">المتبقي</p>
-                          <p className={`text-lg font-black ${(selectedCustomer.financials?.outstandingBalance || 0) > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                            {fmt(selectedCustomer.financials?.outstandingBalance)}
-                          </p>
-                        </div>
+                        <p className="text-xs font-medium text-gray-400">المتبقي</p>
                       </div>
-                    </Card>
-                    <Card className="p-4 border-2 border-amber-100 dark:border-amber-500/20">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-500/10 flex items-center justify-center">
-                          <Star className="w-5 h-5 text-amber-500" fill="currentColor" />
+                      <p className={`text-2xl font-black ${(selectedCustomer.financials?.outstandingBalance || 0) > 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                        {fmt(selectedCustomer.financials?.outstandingBalance)}
+                      </p>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-sm">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center">
+                          <CreditCard className="w-4 h-4 text-blue-500" />
                         </div>
-                        <div>
-                          <p className="text-xs text-gray-400">النقاط</p>
-                          <p className="text-lg font-black text-amber-600">{selectedCustomer.gamification?.points || 0}</p>
-                        </div>
+                        <p className="text-xs font-medium text-gray-400">الحد الائتماني</p>
                       </div>
-                    </Card>
+                      <p className="text-2xl font-black text-gray-900 dark:text-white">{fmt(selectedCustomer.financials?.creditLimit || 10000)}</p>
+                    </div>
                   </div>
 
                   {/* Credit Assessment */}
@@ -500,6 +504,66 @@ export default function CustomersPage() {
                       )}
                     </Card>
                   )}
+
+                  {/* WhatsApp Notification Preferences */}
+                  <Card className="p-5">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-bold flex items-center gap-2">
+                        <MessageCircle className="w-5 h-5 text-green-500" />
+                        إعدادات WhatsApp
+                      </h3>
+                      <button
+                        onClick={async () => {
+                          const newEnabled = !(selectedCustomer.whatsapp?.enabled !== false);
+                          try {
+                            await customersApi.updateWhatsAppPreferences(selectedCustomer._id, { enabled: newEnabled });
+                            setSelectedCustomer(prev => ({ ...prev, whatsapp: { ...prev.whatsapp, enabled: newEnabled } }));
+                            notify.success(newEnabled ? 'تم تفعيل إشعارات WhatsApp' : 'تم تعطيل إشعارات WhatsApp');
+                          } catch { notify.error('خطأ في تحديث الإعدادات'); }
+                        }}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${selectedCustomer.whatsapp?.enabled !== false ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+                      >
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${selectedCustomer.whatsapp?.enabled !== false ? 'translate-x-1' : 'translate-x-6'}`} />
+                      </button>
+                    </div>
+                    {selectedCustomer.whatsapp?.enabled !== false && (
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        {[
+                          { key: 'invoices', label: 'الفواتير', icon: FileText, color: 'text-blue-500' },
+                          { key: 'reminders', label: 'التذكيرات', icon: Clock, color: 'text-amber-500' },
+                          { key: 'statements', label: 'كشف الحساب', icon: DollarSign, color: 'text-purple-500' },
+                          { key: 'payments', label: 'تأكيد الدفع', icon: Check, color: 'text-emerald-500' },
+                        ].map(({ key, label, icon: Icon, color }) => {
+                          const isOn = selectedCustomer.whatsapp?.notifications?.[key] !== false;
+                          return (
+                            <button
+                              key={key}
+                              onClick={async () => {
+                                try {
+                                  await customersApi.updateWhatsAppPreferences(selectedCustomer._id, { notifications: { [key]: !isOn } });
+                                  setSelectedCustomer(prev => ({
+                                    ...prev,
+                                    whatsapp: {
+                                      ...prev.whatsapp,
+                                      notifications: { ...(prev.whatsapp?.notifications || {}), [key]: !isOn },
+                                    },
+                                  }));
+                                  notify.success(`${!isOn ? 'تفعيل' : 'تعطيل'} ${label}`);
+                                } catch { notify.error('خطأ في التحديث'); }
+                              }}
+                              className={`p-3 rounded-xl border-2 transition-all text-center ${isOn
+                                ? 'border-green-200 dark:border-green-500/30 bg-green-50 dark:bg-green-500/10'
+                                : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 opacity-60'}`}
+                            >
+                              <Icon className={`w-5 h-5 mx-auto mb-1 ${isOn ? color : 'text-gray-400'}`} />
+                              <p className="text-xs font-medium">{label}</p>
+                              <p className={`text-[10px] mt-0.5 ${isOn ? 'text-green-600' : 'text-gray-400'}`}>{isOn ? 'مفعل' : 'معطل'}</p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </Card>
 
                   {/* Transaction History with Invoice Details */}
                   <Card className="p-5">

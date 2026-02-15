@@ -96,6 +96,27 @@ class InvoiceController {
         return next(AppError.badRequest(`⛔ البيع ممنوع لهذا العميل: ${customer.salesBlockedReason || 'تم منع البيع'}`));
       }
 
+      // Check Credit Limit (New Feature)
+      // Calculate pending amount for this specific invoice
+      // If paymentMethod is CASH, paidAmount = totalAmount (handled later, but we need predictive check)
+      let transactionPendingAmount = 0;
+      if (paymentMethod === PAYMENT_METHODS.CASH) {
+        transactionPendingAmount = 0; // Fully paid, no increase in debt
+      } else if (paymentMethod === PAYMENT_METHODS.INSTALLMENT) {
+        transactionPendingAmount = (subtotal - discount) - (downPayment || 0);
+      } else if (paymentMethod === PAYMENT_METHODS.DEFERRED) {
+        transactionPendingAmount = (subtotal - discount);
+      }
+
+      // Check if this transaction pushes customer over limit
+      const currentBalance = customer.financials.outstandingBalance || 0;
+      const creditLimit = customer.financials.creditLimit || 0; // 0 means no limit? No, usually distinct. Let's assume default 0 means unlimited or strict? 
+      // Actually schema default is 10000. 
+      
+      if (creditLimit > 0 && (currentBalance + transactionPendingAmount) > creditLimit) {
+         return next(AppError.badRequest(`⛔ تجاوز الحد الائتماني! رصيد العميل الحالي (${currentBalance}) + المبلغ المتبقي (${transactionPendingAmount}) يتجاوز الحد المسموح (${creditLimit})`));
+      }
+
       // Validate and prepare items
       const invoiceItems = [];
       let subtotal = 0;
@@ -196,8 +217,8 @@ class InvoiceController {
       customer.recordPurchase(totalAmount, invoiceData.paidAmount);
       await customer.save();
 
-      // Send WhatsApp notification (non-blocking)
-      if (sendWhatsApp && customer.whatsapp?.enabled) {
+      // Send WhatsApp notification (non-blocking) — respects customer preferences
+      if (sendWhatsApp && customer.whatsapp?.enabled && customer.whatsapp?.notifications?.invoices !== false) {
         WhatsAppService.sendInvoiceNotification(
           customer.whatsapp.number || customer.phone,
           invoice,
@@ -263,6 +284,16 @@ class InvoiceController {
 
         // In-app notification
         NotificationService.onPaymentReceived(req.tenantId, invoice, amount, customer.name).catch(() => {});
+
+        // WhatsApp payment confirmation (non-blocking) — respects customer preferences
+        if (customer.whatsapp?.enabled && customer.whatsapp?.notifications?.payments !== false) {
+          const whatsappPhone = customer.whatsapp?.number || customer.phone;
+          if (whatsappPhone) {
+            WhatsAppService.sendPaymentReceivedTemplate(
+              whatsappPhone, customer, amount, invoice.remainingAmount, invoice.invoiceNumber
+            ).catch(() => {});
+          }
+        }
       }
 
       ApiResponse.success(res, invoice, 'تم تسجيل الدفعة بنجاح');

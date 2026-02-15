@@ -7,11 +7,13 @@ import Header from './components/Header';
 import AnimatedNotification from './components/AnimatedNotification';
 import ErrorBoundary from './components/ErrorBoundary';
 import SplashScreen from './components/SplashScreen';
+import OfflineIndicator from './components/OfflineIndicator';
 import LoginPage from './pages/LoginPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import DashboardPage from './pages/DashboardPage';
 import ProductsPage from './pages/ProductsPage';
+import StockAdjustmentsPage from './pages/StockAdjustmentsPage';
 import CustomersPage from './pages/CustomersPage';
 import InvoicesPage from './pages/InvoicesPage';
 import SuppliersPage from './pages/SuppliersPage';
@@ -22,6 +24,10 @@ import CommandCenterPage from './pages/CommandCenterPage';
 import ExpensesPage from './pages/ExpensesPage';
 import LowStockPage from './pages/LowStockPage';
 import SettingsPage from './pages/SettingsPage';
+import CashDrawerPage from './pages/CashDrawerPage';
+import RolesPage from './pages/RolesPage';
+import ActivityLogsPage from './pages/ActivityLogsPage';
+import PurchaseOrdersPage from './pages/PurchaseOrdersPage';
 import AgingReportPage from './pages/AgingReportPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
 import AdminTenantsPage from './pages/AdminTenantsPage';
@@ -30,6 +36,15 @@ import AdminAuditLogsPage from './pages/AdminAuditLogsPage';
 import AdminStatisticsPage from './pages/AdminStatisticsPage';
 import ImportDataPage from './pages/ImportDataPage';
 import BackupRestorePage from './pages/BackupRestorePage';
+
+// Storefront Pages
+import StorefrontLayout from './storefront/StorefrontLayout';
+import StorefrontHome from './storefront/StorefrontHome';
+import ProductCatalog from './storefront/ProductCatalog';
+import ProductDetails from './storefront/ProductDetails';
+import ShoppingCart from './storefront/ShoppingCart';
+import Checkout from './storefront/Checkout';
+import OrderConfirmation from './storefront/OrderConfirmation';
 
 // Protected Route wrapper
 function ProtectedRoute({ children }) {
@@ -77,6 +92,16 @@ function MainLayout() {
               {/* Admin Routes - Protected */}
               <Route path="/admin/dashboard" element={<AdminRoute><AdminDashboardPage /></AdminRoute>} />
               <Route path="/admin/statistics" element={<AdminRoute><AdminStatisticsPage /></AdminRoute>} />
+              <Route path="/admin/import" element={<AdminRoute><ImportDataPage /></AdminRoute>} />
+              <Route path="/admin/backup" element={<AdminRoute><BackupRestorePage /></AdminRoute>} />
+
+              {/* Storefront Routes (Public) */}
+              <Route path="/store" element={<StorefrontLayout><StorefrontHome /></StorefrontLayout>} />
+              <Route path="/store/products" element={<StorefrontLayout><ProductCatalog /></StorefrontLayout>} />
+              <Route path="/store/products/:id" element={<StorefrontLayout><ProductDetails /></StorefrontLayout>} />
+              <Route path="/store/cart" element={<StorefrontLayout><ShoppingCart /></StorefrontLayout>} />
+              <Route path="/store/checkout" element={<StorefrontLayout><Checkout /></StorefrontLayout>} />
+              <Route path="/store/order/:id" element={<StorefrontLayout><OrderConfirmation /></StorefrontLayout>} />
               <Route path="/admin/tenants" element={<AdminRoute><AdminTenantsPage /></AdminRoute>} />
               <Route path="/admin/users" element={<AdminRoute><AdminUsersPage /></AdminRoute>} />
               <Route path="/admin/audit-logs" element={<AdminRoute><AdminAuditLogsPage /></AdminRoute>} />
@@ -86,6 +111,7 @@ function MainLayout() {
               <Route path="/quick-sale" element={<QuickSalePage />} />
               <Route path="/command-center" element={<CommandCenterPage />} />
               <Route path="/products" element={<ProductsPage />} />
+              <Route path="/stock-adjustments" element={<StockAdjustmentsPage />} />
               <Route path="/low-stock" element={<LowStockPage />} />
               <Route path="/customers" element={<CustomersPage />} />
               <Route path="/invoices" element={<InvoicesPage />} />
@@ -95,6 +121,10 @@ function MainLayout() {
               <Route path="/business-reports" element={<BusinessReportsPage />} />
               <Route path="/aging-report" element={<AgingReportPage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/cash-drawer" element={<CashDrawerPage />} />
+              <Route path="/roles" element={<RolesPage />} />
+              <Route path="/activity-logs" element={<ActivityLogsPage />} />
+              <Route path="/purchase-orders" element={<PurchaseOrdersPage />} />
               <Route path="/import" element={<ImportDataPage />} />
               <Route path="/backup" element={<BackupRestorePage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
@@ -140,6 +170,10 @@ export default function App() {
             },
           }}
         />
+        
+        {/* Offline Indicator */}
+        <OfflineIndicator />
+        
         <Routes>
           <Route path="/login" element={
             isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />

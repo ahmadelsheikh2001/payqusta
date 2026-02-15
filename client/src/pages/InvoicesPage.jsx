@@ -17,6 +17,7 @@ export default function InvoicesPage() {
   const [payInvoice, setPayInvoice] = useState(null);
   const [payAmount, setPayAmount] = useState('');
   const [creating, setCreating] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
 
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
@@ -26,7 +27,7 @@ export default function InvoicesPage() {
   const [installments, setInstallments] = useState(3);
   const [frequency, setFrequency] = useState('monthly');
   const [downPayment, setDownPayment] = useState('');
-  const LIMIT = 15;
+  const LIMIT = 10;
 
   const loadInvoices = useCallback(async () => {
     setLoading(true);
@@ -51,7 +52,7 @@ export default function InvoicesPage() {
       ]);
       setCustomers(custRes.data.data || []);
       setProducts(prodRes.data.data || []);
-      setCart([]); setSelectedCustomer(''); setPaymentMethod('cash'); setDownPayment('');
+      setCart([]); setSelectedCustomer(''); setPaymentMethod('cash'); setDownPayment(''); setProductSearch('');
       setShowCreate(true);
     } catch { toast.error('خطأ في تحميل البيانات'); }
   };
@@ -147,60 +148,121 @@ export default function InvoicesPage() {
 
   return (
     <div className="space-y-5 animate-fade-in">
-      <div className="flex flex-wrap items-center gap-3">
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm cursor-pointer">
-          <option value="">كل الفواتير</option>
-          <option value="paid">✅ مدفوع</option>
-          <option value="partially_paid">🟡 جزئي</option>
-          <option value="pending">⏳ معلق</option>
-          <option value="overdue">🔴 متأخر</option>
-        </select>
-        <div className="flex-1" />
-        <Button icon={<Plus className="w-4 h-4" />} onClick={openCreate}>إنشاء فاتورة</Button>
+      {/* Header Actions */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white dark:bg-gray-900 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:w-64">
+             <Filter className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+             <select 
+              value={statusFilter} 
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full pr-10 pl-4 py-2.5 rounded-xl border-2 border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 text-sm focus:border-primary-500 transition-all appearance-none cursor-pointer outline-none font-medium"
+            >
+              <option value="">كل الفواتير</option>
+              <option value="paid">✅ مدفوع بالكامل</option>
+              <option value="partially_paid">🟡 مدفوع جزئياً</option>
+              <option value="pending">⏳ معلق (غير مدفوع)</option>
+              <option value="overdue">🔴 متأخر عن السداد</option>
+            </select>
+          </div>
+        </div>
+        
+        <Button 
+          icon={<Plus className="w-5 h-5" />} 
+          onClick={openCreate}
+          className="w-full sm:w-auto shadow-lg shadow-primary-500/20"
+        >
+          إنشاء فاتورة جديدة
+        </Button>
       </div>
 
       {loading ? <LoadingSpinner /> : invoices.length === 0 ? (
-        <EmptyState icon={<FileText className="w-8 h-8" />} title="لا توجد فواتير" description="ابدأ بإنشاء أول فاتورة" />
+        <EmptyState 
+          icon={<FileText className="w-12 h-12 text-gray-300" />} 
+          title="لا توجد فواتير" 
+          description="لم يتم إنشاء أي فواتير بعد. ابدأ بإنشاء فاتورة جديدة لعرضها هنا." 
+        />
       ) : (
         <>
-          <div className="space-y-3">
-            {invoices.map((inv) => (
-              <Card key={inv._id} className="p-4 animate-fade-in">
-                <div className="flex flex-wrap items-center gap-4">
-                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                    inv.status === 'paid' ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500'
-                      : inv.status === 'overdue' ? 'bg-red-50 dark:bg-red-500/10 text-red-500'
-                      : 'bg-amber-50 dark:bg-amber-500/10 text-amber-500'
-                  }`}><FileText className="w-5 h-5" /></div>
-                  <div className="flex-1 min-w-[130px]">
-                    <p className="font-bold text-sm">{inv.invoiceNumber}</p>
-                    <p className="text-xs text-gray-400">{inv.customer?.name || '—'} — {methodLabel(inv.paymentMethod)}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-[10px] text-gray-400">الإجمالي</p>
-                    <p className="font-extrabold">{fmt(inv.totalAmount)} ج.م</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-[10px] text-gray-400">المتبقي</p>
-                    <p className={`font-extrabold ${inv.remainingAmount > 0 ? 'text-red-500' : 'text-emerald-500'}`}>
-                      {inv.remainingAmount > 0 ? `${fmt(inv.remainingAmount)} ج.م` : '✓ مسدد'}
-                    </p>
-                  </div>
-                  {statusBadge(inv.status)}
-                  <div className="flex gap-1.5">
-                    {inv.remainingAmount > 0 && (
-                      <>
-                        <Button size="sm" variant="ghost" icon={<CreditCard className="w-3.5 h-3.5" />} onClick={() => openPay(inv)}>دفع</Button>
-                        <Button size="sm" variant="success" onClick={() => handlePayAll(inv)}>سداد كامل</Button>
-                      </>
-                    )}
-                    <Button size="sm" variant="whatsapp" icon={<Send className="w-3.5 h-3.5" />} onClick={() => handleSendWhatsApp(inv)} />
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
+          <Card className="overflow-hidden border-0 shadow-lg shadow-gray-100/50 dark:shadow-none">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-right">
+                <thead>
+                  <tr className="bg-gray-50/50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800">
+                    <th className="px-6 py-4 font-bold text-gray-500 dark:text-gray-400">رقم الفاتورة</th>
+                    <th className="px-6 py-4 font-bold text-gray-500 dark:text-gray-400">العميل</th>
+                    <th className="px-6 py-4 font-bold text-gray-500 dark:text-gray-400">التاريخ</th>
+                    <th className="px-6 py-4 font-bold text-gray-500 dark:text-gray-400">الحالة</th>
+                    <th className="px-6 py-4 font-bold text-gray-500 dark:text-gray-400">الإجمالي</th>
+                    <th className="px-6 py-4 font-bold text-gray-500 dark:text-gray-400">المتبقي</th>
+                    <th className="px-6 py-4 font-bold text-gray-500 dark:text-gray-400 text-center">الإجراءات</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
+                  {invoices.map((inv) => (
+                    <tr key={inv._id} className="group hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                      <td className="px-6 py-4 font-bold text-primary-600 dark:text-primary-400">
+                        {inv.invoiceNumber}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="font-medium">{inv.customer?.name || '—'}</div>
+                        <div className="text-xs text-gray-400 mt-0.5">{inv.customer?.phone}</div>
+                      </td>
+                      <td className="px-6 py-4 text-gray-500">
+                        {new Date(inv.createdAt).toLocaleDateString('ar-EG')}
+                        <div className="text-[10px] text-gray-400">{new Date(inv.createdAt).toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        {statusBadge(inv.status)}
+                        <div className="text-[10px] text-gray-400 mt-1">{methodLabel(inv.paymentMethod)}</div>
+                      </td>
+                      <td className="px-6 py-4 font-bold">
+                        {fmt(inv.totalAmount)} <span className="text-[10px] font-normal text-gray-400">ج.م</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        {inv.remainingAmount > 0 ? (
+                           <span className="font-bold text-red-500">{fmt(inv.remainingAmount)} <span className="text-[10px] font-normal">ج.م</span></span>
+                        ) : (
+                           <span className="font-bold text-emerald-500 flex items-center gap-1"><Check className="w-3 h-3" /> مسدد</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-center gap-2">
+                          {inv.remainingAmount > 0 ? (
+                            <>
+                              <button 
+                                onClick={() => openPay(inv)}
+                                className="p-2 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-emerald-500/20 transition-colors"
+                                title="تسجيل دفعة"
+                              >
+                                <CreditCard className="w-4 h-4" />
+                              </button>
+                              <button 
+                                onClick={() => handlePayAll(inv)}
+                                className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-500/10 dark:text-blue-400 transition-colors"
+                                title="سداد كامل"
+                              >
+                                <Check className="w-4 h-4" />
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-emerald-500"><Check className="w-5 h-5" /></span>
+                          )}
+                          <button 
+                            onClick={() => handleSendWhatsApp(inv)}
+                            className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-500/10 dark:text-green-400 dark:hover:bg-green-500/20 transition-colors"
+                            title="إرسال عبر واتساب"
+                          >
+                            <Send className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
           <Pagination currentPage={page} totalPages={pagination.totalPages} totalItems={pagination.totalItems} onPageChange={setPage} />
         </>
       )}
@@ -216,13 +278,58 @@ export default function InvoicesPage() {
 
         <div className="mb-4">
           <label className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-2">إضافة منتجات</label>
-          <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
-            {products.filter((p) => (p.stock?.quantity || 0) > 0).map((p) => (
-              <button key={p._id} onClick={() => addToCart(p)}
-                className={`px-3 py-2 rounded-xl border-2 text-xs font-semibold transition-all ${
-                  cart.find((c) => c.productId === p._id) ? 'border-primary-500 bg-primary-50 dark:bg-primary-500/10 text-primary-600' : 'border-gray-200 dark:border-gray-700 hover:border-primary-300'
-                }`}>{p.name} — <span className="text-primary-500">{fmt(p.price)}</span></button>
-            ))}
+          
+          {/* Product Search */}
+          <div className="relative mb-3">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input 
+              value={productSearch}
+              onChange={(e) => setProductSearch(e.target.value)}
+              placeholder="بحث باسم المنتج أو الباركود..."
+              className="w-full pr-10 pl-4 py-2 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 text-sm focus:border-primary-500 transition-all outline-none"
+              autoFocus
+            />
+          </div>
+
+          <div className="border-2 border-gray-100 dark:border-gray-800 rounded-xl overflow-hidden max-h-48 overflow-y-auto bg-gray-50/30 dark:bg-gray-800/20">
+            {products
+              .filter((p) => {
+                const term = productSearch.toLowerCase();
+                return (
+                  (p.stock?.quantity || 0) > 0 && 
+                  (p.name.toLowerCase().includes(term) || p.sku?.toLowerCase().includes(term))
+                );
+              })
+              .map((p) => {
+                const inCart = cart.find((c) => c.productId === p._id);
+                return (
+                  <div key={p._id} className="flex items-center justify-between p-2 border-b border-gray-100 dark:border-gray-800 last:border-0 hover:bg-white dark:hover:bg-gray-800 transition-colors">
+                    <div>
+                      <p className="font-bold text-xs text-gray-800 dark:text-gray-200">{p.name}</p>
+                      <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                        {p.sku && <span className="font-mono bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded text-[10px]">{p.sku}</span>}
+                        <span>{fmt(p.price)} ج.م</span>
+                        <span className={p.stock?.quantity < 5 ? 'text-red-500' : 'text-emerald-500'}>
+                          ({p.stock?.quantity})
+                        </span>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => addToCart(p)}
+                      className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all ${
+                        inCart 
+                          ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/30' 
+                          : 'bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 hover:border-primary-500 hover:text-primary-500'
+                      }`}
+                    >
+                      {inCart ? `مضاف (${inCart.quantity})` : 'إضافة'}
+                    </button>
+                  </div>
+                );
+              })}
+              {products.filter(p => (p.stock?.quantity || 0) > 0 && (p.name.toLowerCase().includes(productSearch.toLowerCase()) || p.sku?.toLowerCase().includes(productSearch.toLowerCase()))).length === 0 && (
+                <div className="p-4 text-center text-gray-400 text-xs">لا توجد منتجات مطابقة للبحث</div>
+              )}
           </div>
         </div>
 

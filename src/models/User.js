@@ -47,6 +47,15 @@ const userSchema = new mongoose.Schema(
         return this.role !== ROLES.ADMIN;
       },
     },
+    customRole: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Role',
+      default: null,
+    },
+    tenants: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Tenant',
+    }],
     avatar: { type: String, default: null },
     isActive: { type: Boolean, default: true },
     twoFactorEnabled: { type: Boolean, default: false },

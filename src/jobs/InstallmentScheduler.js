@@ -83,10 +83,11 @@ class InstallmentScheduler {
                 installment.dueDate
               ).catch(() => {});
 
-              // WhatsApp reminder (only if enabled)
-              if (tenant.whatsapp?.enabled && tenant.whatsapp?.notifications?.installmentReminder) {
-                const phone =
-                  invoice.customer.whatsapp?.number || invoice.customer.phone;
+              // WhatsApp reminder (only if tenant + customer both enabled)
+              const customerWA = invoice.customer.whatsapp;
+              if (tenant.whatsapp?.enabled && tenant.whatsapp?.notifications?.installmentReminder
+                  && customerWA?.enabled && customerWA?.notifications?.reminders !== false) {
+                const phone = customerWA?.number || invoice.customer.phone;
 
                 await WhatsAppService.sendInstallmentReminder(
                   phone,

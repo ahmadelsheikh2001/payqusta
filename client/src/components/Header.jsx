@@ -4,6 +4,7 @@ import { Menu, Sun, Moon, Search } from 'lucide-react';
 import { useThemeStore } from '../store';
 import NotificationDropdown from './NotificationDropdown';
 import GlobalSearch from './GlobalSearch';
+import BranchSwitcher from './BranchSwitcher';
 
 const pageTitles = {
   '/': 'لوحة التحكم',
@@ -47,6 +48,9 @@ export default function Header({ onMenuClick }) {
         </div>
 
         <div className="flex items-center gap-1.5">
+          {/* Branch Switcher */}
+          <BranchSwitcher />
+
           {/* Global Search */}
           <button
             onClick={() => setSearchOpen(true)}

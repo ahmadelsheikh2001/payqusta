@@ -59,6 +59,23 @@ const tenantSchema = new mongoose.Schema(
       phoneNumber: { type: String },
       phoneNumberId: { type: String },
       accessToken: { type: String },
+      wabaId: { type: String }, // WhatsApp Business Account ID (dynamic)
+      // Per-tenant template name mapping (auto-detected or manual)
+      templateNames: {
+        invoice: { type: String },      // e.g. 'payqusta_invoice' or 'invoice_notification'
+        statement: { type: String },    // e.g. 'payqusta_statement' or 'customer_statement'
+        reminder: { type: String },     // e.g. 'payqusta_reminder' or 'payment_reminder'
+        payment: { type: String },      // e.g. 'payqusta_payment' or 'payment_received'
+        restock: { type: String },      // e.g. 'payqusta_restock' or 'restock_request'
+      },
+      // Per-tenant template language mapping
+      templateLanguages: {
+        invoice: { type: String, default: 'ar_EG' },
+        statement: { type: String, default: 'ar_EG' },
+        reminder: { type: String, default: 'ar_EG' },
+        payment: { type: String, default: 'ar_EG' },
+        restock: { type: String, default: 'en' },
+      },
       notifications: {
         installmentReminder: { type: Boolean, default: true },
         invoiceCreated: { type: Boolean, default: true },

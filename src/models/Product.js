@@ -42,6 +42,10 @@ const productSchema = new mongoose.Schema(
       required: [true, 'سعر التكلفة مطلوب'],
       min: [0, 'التكلفة لا يمكن أن تكون سالبة'],
     },
+    // Tax
+    taxable: { type: Boolean, default: true },
+    taxRate: { type: Number, default: 14, min: 0, max: 100 }, // VAT % (Egypt = 14%)
+    priceIncludesTax: { type: Boolean, default: false },
     // Stock
     stock: {
       quantity: { type: Number, default: 0, min: 0 },
@@ -65,6 +69,25 @@ const productSchema = new mongoose.Schema(
     barcode: { type: String },
     tags: [{ type: String }],
     isActive: { type: Boolean, default: true },
+    
+    // Product Variants (Size/Color)
+    hasVariants: { type: Boolean, default: false },
+    variants: [
+      {
+        sku: { type: String, trim: true, uppercase: true },
+        attributes: {
+          type: Map,
+          of: String,
+          default: {}, // e.g., { size: 'M', color: 'Red' }
+        },
+        price: { type: Number, min: 0 },
+        cost: { type: Number, min: 0 },
+        stock: { type: Number, default: 0, min: 0 },
+        barcode: { type: String },
+        isActive: { type: Boolean, default: true },
+      },
+    ],
+    
     // Stock alerts
     lowStockAlertSent: { type: Boolean, default: false },
     outOfStockAlertSent: { type: Boolean, default: false },

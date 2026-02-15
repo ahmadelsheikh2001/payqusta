@@ -10,22 +10,141 @@ const FormData = require('form-data');
 const Helpers = require('../utils/helpers');
 const logger = require('../utils/logger');
 
-// Default Template Names (create these in Meta Business Suite)
-const TEMPLATES = {
-  STATEMENT: 'customer_statement',      // كشف حساب
-  PAYMENT_REMINDER: 'payment_reminder', // تذكير بالقسط
-  INVOICE: 'invoice_notification',      // فاتورة جديدة
-  RESTOCK: 'restock_request',           // طلب إعادة تخزين
-  WELCOME: 'welcome_message',           // رسالة ترحيب
-  PAYMENT_RECEIVED: 'payment_received', // تأكيد استلام دفعة
+// Default Template Names — fallback when no tenant config is set
+const DEFAULT_TEMPLATES = {
+  STATEMENT: 'payqusta_statement',
+  PAYMENT_REMINDER: 'payqusta_reminder',
+  INVOICE: 'payqusta_invoice',
+  RESTOCK: 'payqusta_restock',
+  PAYMENT_RECEIVED: 'payqusta_payment',
+};
+
+// Default Language codes per template
+const DEFAULT_TEMPLATE_LANGUAGES = {
+  invoice: 'ar_EG',
+  statement: 'ar_EG',
+  reminder: 'ar_EG',
+  payment: 'ar_EG',
+  restock: 'en',
+};
+
+// Known template name patterns for auto-detection
+const TEMPLATE_PATTERNS = {
+  invoice: ['invoice', 'فاتورة'],
+  statement: ['statement', 'كشف'],
+  reminder: ['reminder', 'تذكير'],
+  payment: ['payment', 'دفع', 'استلام'],
+  restock: ['restock', 'تخزين', 'stock'],
 };
 
 class WhatsAppService {
   constructor() {
-    this.apiUrl = process.env.WHATSAPP_API_URL || 'https://graph.facebook.com/v18.0';
+    this.apiUrl = process.env.WHATSAPP_API_URL || 'https://graph.facebook.com/v21.0';
     this.phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
     this.accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
-    this.templates = TEMPLATES;
+    this.templates = DEFAULT_TEMPLATES;
+  }
+
+  /**
+   * Get template name for a purpose, using tenant config or fallback to defaults
+   * @param {string} purpose - 'invoice', 'statement', 'reminder', 'payment', 'restock'
+   * @param {object} tenantWhatsapp - tenant.whatsapp config (optional)
+   */
+  getTemplateName(purpose, tenantWhatsapp = null) {
+    // Check tenant-specific template name first
+    if (tenantWhatsapp?.templateNames?.[purpose]) {
+      return tenantWhatsapp.templateNames[purpose];
+    }
+    // Fallback to defaults
+    const purposeMap = {
+      invoice: DEFAULT_TEMPLATES.INVOICE,
+      statement: DEFAULT_TEMPLATES.STATEMENT,
+      reminder: DEFAULT_TEMPLATES.PAYMENT_REMINDER,
+      payment: DEFAULT_TEMPLATES.PAYMENT_RECEIVED,
+      restock: DEFAULT_TEMPLATES.RESTOCK,
+    };
+    return purposeMap[purpose] || DEFAULT_TEMPLATES.INVOICE;
+  }
+
+  /**
+   * Get template language for a purpose, using tenant config or fallback
+   */
+  getTemplateLanguage(purpose, tenantWhatsapp = null) {
+    if (tenantWhatsapp?.templateLanguages?.[purpose]) {
+      return tenantWhatsapp.templateLanguages[purpose];
+    }
+    return DEFAULT_TEMPLATE_LANGUAGES[purpose] || 'ar_EG';
+  }
+
+  /**
+   * Get WABA ID — from tenant config or fallback to env
+   */
+  getWabaId(tenantWhatsapp = null) {
+    return tenantWhatsapp?.wabaId || (process.env.WABA_ID || '').trim();
+  }
+
+  /**
+   * Auto-detect and map templates from a WABA
+   * Fetches all templates and matches them to purposes by name patterns
+   */
+  async autoDetectTemplates(wabaId) {
+    this.refreshCredentials();
+    if (!this.isConfigured()) {
+      return { success: false, reason: 'not_configured' };
+    }
+
+    if (!wabaId) {
+      return { success: false, message: 'WABA_ID مطلوب' };
+    }
+
+    try {
+      const response = await axios.get(
+        `${this.apiUrl}/${wabaId}/message_templates`,
+        {
+          headers: { Authorization: `Bearer ${this.accessToken}` },
+          params: { limit: 100 },
+        }
+      );
+
+      const templates = response.data?.data || [];
+      const approvedTemplates = templates.filter(t => t.status === 'APPROVED');
+
+      // Auto-map by matching template name against known patterns
+      const detectedMap = {};
+      const detectedLanguages = {};
+
+      for (const [purpose, patterns] of Object.entries(TEMPLATE_PATTERNS)) {
+        // Find first approved template matching any pattern for this purpose
+        const match = approvedTemplates.find(t =>
+          patterns.some(p => t.name.toLowerCase().includes(p))
+        );
+        if (match) {
+          detectedMap[purpose] = match.name;
+          detectedLanguages[purpose] = match.language || DEFAULT_TEMPLATE_LANGUAGES[purpose];
+        }
+      }
+
+      return {
+        success: true,
+        wabaId,
+        totalTemplates: templates.length,
+        approvedCount: approvedTemplates.length,
+        allTemplates: templates.map(t => ({
+          name: t.name,
+          status: t.status,
+          category: t.category,
+          language: t.language,
+          id: t.id,
+        })),
+        detectedMap,
+        detectedLanguages,
+        unmapped: Object.keys(TEMPLATE_PATTERNS).filter(p => !detectedMap[p]),
+      };
+    } catch (error) {
+      const errData = error.response?.data?.error;
+      logger.error(`[WhatsApp] Auto-detect failed: ${JSON.stringify(errData || error.message)}`);
+      return { success: false, error: errData || error.message };
+    }
   }
 
   /**
@@ -195,42 +314,44 @@ class WhatsAppService {
 
   /**
    * Send customer statement using template
-   * Template: customer_statement
    * Params: {{1}} = customer_name, {{2}} = total_purchases, {{3}} = total_paid, {{4}} = outstanding
+   * @param {object} tenantWhatsapp - tenant.whatsapp config (optional, for dynamic template names)
    */
-  async sendStatementTemplate(phone, customer) {
+  async sendStatementTemplate(phone, customer, tenantWhatsapp = null) {
     const params = [
       customer.name,
       Helpers.formatCurrency(customer.financials?.totalPurchases || 0),
       Helpers.formatCurrency(customer.financials?.totalPaid || 0),
       Helpers.formatCurrency(customer.financials?.outstandingBalance || 0),
     ];
-    
-    return this.sendTemplate(phone, this.templates.STATEMENT, 'ar', params);
+
+    const templateName = this.getTemplateName('statement', tenantWhatsapp);
+    const lang = this.getTemplateLanguage('statement', tenantWhatsapp);
+    return this.sendTemplate(phone, templateName, lang, params);
   }
 
   /**
    * Send payment reminder using template
-   * Template: payment_reminder
    * Params: {{1}} = customer_name, {{2}} = amount, {{3}} = due_date, {{4}} = invoice_number
    */
-  async sendPaymentReminderTemplate(phone, customer, amount, dueDate, invoiceNumber) {
+  async sendPaymentReminderTemplate(phone, customer, amount, dueDate, invoiceNumber, tenantWhatsapp = null) {
     const params = [
       customer.name,
       Helpers.formatCurrency(amount),
       new Date(dueDate).toLocaleDateString('ar-EG'),
       invoiceNumber,
     ];
-    
-    return this.sendTemplate(phone, this.templates.PAYMENT_REMINDER, 'ar', params);
+
+    const templateName = this.getTemplateName('reminder', tenantWhatsapp);
+    const lang = this.getTemplateLanguage('reminder', tenantWhatsapp);
+    return this.sendTemplate(phone, templateName, lang, params);
   }
 
   /**
    * Send invoice notification using template
-   * Template: invoice_notification
    * Params: {{1}} = customer_name, {{2}} = invoice_number, {{3}} = total_amount, {{4}} = payment_method
    */
-  async sendInvoiceTemplate(phone, customer, invoice) {
+  async sendInvoiceTemplate(phone, customer, invoice, tenantWhatsapp = null) {
     const paymentMethods = { cash: 'نقداً', installment: 'بالتقسيط', deferred: 'آجل' };
     const params = [
       customer.name,
@@ -238,40 +359,44 @@ class WhatsAppService {
       Helpers.formatCurrency(invoice.totalAmount),
       paymentMethods[invoice.paymentMethod] || 'نقداً',
     ];
-    
-    return this.sendTemplate(phone, this.templates.INVOICE, 'ar', params);
+
+    const templateName = this.getTemplateName('invoice', tenantWhatsapp);
+    const lang = this.getTemplateLanguage('invoice', tenantWhatsapp);
+    return this.sendTemplate(phone, templateName, lang, params);
   }
 
   /**
    * Send restock request to supplier using template
-   * Template: restock_request
    * Params: {{1}} = store_name, {{2}} = product_name, {{3}} = quantity, {{4}} = current_stock
    */
-  async sendRestockTemplate(phone, storeName, product, quantity) {
+  async sendRestockTemplate(phone, storeName, product, quantity, tenantWhatsapp = null) {
     const params = [
       storeName,
       product.name,
-      `${quantity} ${product.stock?.unit || 'قطعة'}`,
-      `${product.stock?.quantity || 0} ${product.stock?.unit || 'قطعة'}`,
+      `${quantity} ${product.stock?.unit || 'unit'}`,
+      `${product.stock?.quantity || 0} ${product.stock?.unit || 'unit'}`,
     ];
-    
-    return this.sendTemplate(phone, this.templates.RESTOCK, 'ar', params);
+
+    const templateName = this.getTemplateName('restock', tenantWhatsapp);
+    const lang = this.getTemplateLanguage('restock', tenantWhatsapp);
+    return this.sendTemplate(phone, templateName, lang, params);
   }
 
   /**
    * Send payment received confirmation using template
-   * Template: payment_received
    * Params: {{1}} = customer_name, {{2}} = amount, {{3}} = remaining, {{4}} = invoice_number
    */
-  async sendPaymentReceivedTemplate(phone, customer, amount, remaining, invoiceNumber) {
+  async sendPaymentReceivedTemplate(phone, customer, amount, remaining, invoiceNumber, tenantWhatsapp = null) {
     const params = [
       customer.name,
       Helpers.formatCurrency(amount),
       Helpers.formatCurrency(remaining),
       invoiceNumber,
     ];
-    
-    return this.sendTemplate(phone, this.templates.PAYMENT_RECEIVED, 'ar', params);
+
+    const templateName = this.getTemplateName('payment', tenantWhatsapp);
+    const lang = this.getTemplateLanguage('payment', tenantWhatsapp);
+    return this.sendTemplate(phone, templateName, lang, params);
   }
 
   /**
@@ -437,45 +562,190 @@ class WhatsAppService {
    */
 
   /**
-   * Get list of available templates from Meta
+   * Get list of available templates from Meta Business Account
+   * @param {string} overrideWabaId - Optional WABA ID override (from tenant settings)
+   * @param {object} tenantWhatsapp - Optional tenant whatsapp config for template name resolution
    */
-  async getTemplates() {
+  async getTemplates(overrideWabaId = null, tenantWhatsapp = null) {
+    this.refreshCredentials();
+    if (!this.isConfigured()) {
+      return { success: false, reason: 'not_configured', message: 'WhatsApp غير مُعد' };
+    }
+
+    try {
+      let wabaId = overrideWabaId || this.getWabaId(tenantWhatsapp);
+
+      if (!wabaId) {
+        return {
+          success: false,
+          message: 'WABA_ID غير موجود. أضفه في الإعدادات أو ملف .env',
+          hint: 'يمكنك إيجاده في Meta Business Suite → WhatsApp → Business Account Settings',
+        };
+      }
+
+      wabaId = wabaId.trim();
+
+      // Fetch all templates from Meta
+      const response = await axios.get(
+        `${this.apiUrl}/${wabaId}/message_templates`,
+        {
+          headers: { Authorization: `Bearer ${this.accessToken}` },
+          params: { limit: 100 },
+        }
+      );
+
+      const templates = response.data?.data || [];
+      logger.info(`[WhatsApp] Found ${templates.length} templates on WABA ${wabaId}`);
+
+      // Get currently mapped template names (from tenant or defaults)
+      const currentMap = {
+        invoice: this.getTemplateName('invoice', tenantWhatsapp),
+        statement: this.getTemplateName('statement', tenantWhatsapp),
+        reminder: this.getTemplateName('reminder', tenantWhatsapp),
+        payment: this.getTemplateName('payment', tenantWhatsapp),
+        restock: this.getTemplateName('restock', tenantWhatsapp),
+      };
+
+      const templateIndex = {};
+      for (const t of templates) {
+        templateIndex[t.name] = {
+          name: t.name,
+          status: t.status,
+          category: t.category,
+          language: t.language,
+          id: t.id,
+        };
+      }
+
+      // Check status of currently mapped templates
+      const required = Object.entries(currentMap).map(([purpose, name]) => ({
+        purpose,
+        name,
+        exists: !!templateIndex[name],
+        status: templateIndex[name]?.status || 'NOT_FOUND',
+        category: templateIndex[name]?.category || '-',
+        language: templateIndex[name]?.language || '-',
+      }));
+
+      return {
+        success: true,
+        wabaId,
+        totalOnAccount: templates.length,
+        allTemplates: templates.map(t => ({
+          name: t.name,
+          status: t.status,
+          category: t.category,
+          language: t.language,
+          id: t.id,
+        })),
+        requiredTemplates: required,
+        missingCount: required.filter(r => !r.exists).length,
+      };
+    } catch (error) {
+      const errData = error.response?.data?.error;
+      logger.error(`[WhatsApp] Get templates failed: ${JSON.stringify(errData || error.message)}`);
+      return { success: false, error: errData || error.message };
+    }
+  }
+
+  /**
+   * Create all required templates on Meta (MARKETING category for faster approval)
+   * Call this after deleting old templates and waiting for deletion to complete
+   */
+  async createAllTemplates(overrideWabaId = null) {
     this.refreshCredentials();
     if (!this.isConfigured()) {
       return { success: false, reason: 'not_configured' };
     }
 
-    try {
-      // Get business account ID from phone number
-      const phoneInfoResponse = await axios.get(
-        `${this.apiUrl}/${this.phoneNumberId}`,
-        {
-          headers: { Authorization: `Bearer ${this.accessToken}` },
-          params: { fields: 'verified_name,display_phone_number' },
-        }
-      );
-
-      logger.info(`[WhatsApp] Phone Info: ${JSON.stringify(phoneInfoResponse.data)}`);
-
-      // Get templates requires WABA ID, which we might not have directly
-      // Return configured templates instead
-      return {
-        success: true,
-        phoneInfo: phoneInfoResponse.data,
-        configuredTemplates: this.templates,
-        hint: 'قم بإنشاء هذه القوالب في Meta Business Suite',
-      };
-    } catch (error) {
-      logger.error(`[WhatsApp] Get templates failed: ${error.message}`);
-      return { success: false, error: error.message };
+    const wabaId = (overrideWabaId || process.env.WABA_ID || '').trim();
+    if (!wabaId) {
+      return { success: false, message: 'WABA_ID غير موجود في .env' };
     }
+
+    const templateDefs = [
+      {
+        name: 'payqusta_invoice',
+        category: 'MARKETING',
+        language: 'ar_EG',
+        body: 'مرحباً {{1}} 👋\n\nتم إنشاء فاتورة جديدة رقم {{2}}\n💰 الإجمالي: {{3}}\n💳 طريقة الدفع: {{4}}\n\nشكراً لثقتكم — PayQusta 💙',
+        example: [['أحمد', 'INV-001', '1,500.00 ج.م', 'نقداً']],
+      },
+      {
+        name: 'payqusta_statement',
+        category: 'MARKETING',
+        language: 'ar_EG',
+        body: 'مرحباً {{1}} 👋\n\nكشف حسابك:\n💰 إجمالي المشتريات: {{2}}\n✅ المسدد: {{3}}\n⚠️ المتبقي: {{4}}\n\n— PayQusta 💙',
+        example: [['أحمد', '10,000.00 ج.م', '7,500.00 ج.م', '2,500.00 ج.م']],
+      },
+      {
+        name: 'payqusta_reminder',
+        category: 'MARKETING',
+        language: 'ar_EG',
+        body: 'مرحباً {{1}} 👋\n\n⏰ تذكير بموعد القسط\n💰 المبلغ: {{2}}\n📅 تاريخ الاستحقاق: {{3}}\n📄 فاتورة رقم: {{4}}\n\nشكراً لالتزامكم — PayQusta 💙',
+        example: [['أحمد', '500.00 ج.م', '15/3/2026', 'INV-001']],
+      },
+      {
+        name: 'payqusta_payment',
+        category: 'MARKETING',
+        language: 'ar_EG',
+        body: 'مرحباً {{1}} 👋\n\n✅ تم استلام دفعة\n💰 المبلغ: {{2}}\n📊 المتبقي: {{3}}\n📄 فاتورة رقم: {{4}}\n\nشكراً لالتزامكم — PayQusta 💙',
+        example: [['أحمد', '500.00 ج.م', '1,000.00 ج.م', 'INV-001']],
+      },
+      {
+        name: 'payqusta_restock',
+        category: 'MARKETING',
+        language: 'en',
+        body: 'Restock Request from {{1}}\n\nProduct: {{2}}\nQuantity needed: {{3}}\nCurrent stock: {{4}}\n\nPlease contact the supplier to reorder.',
+        example: [['PayQusta Store', 'iPhone 15', '50 units', '5 units']],
+      },
+    ];
+
+    const results = [];
+    for (const def of templateDefs) {
+      try {
+        const response = await axios.post(
+          `${this.apiUrl}/${wabaId}/message_templates`,
+          {
+            name: def.name,
+            category: def.category,
+            language: def.language,
+            components: [{
+              type: 'BODY',
+              text: def.body,
+              example: { body_text: def.example },
+            }],
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${this.accessToken}`,
+              'Content-Type': 'application/json',
+            },
+            timeout: 15000,
+          }
+        );
+        results.push({ name: def.name, success: true, id: response.data?.id, status: response.data?.status });
+        logger.info(`[WhatsApp] ✅ Template "${def.name}" created: ${response.data?.id}`);
+      } catch (error) {
+        const errData = error.response?.data?.error;
+        results.push({ name: def.name, success: false, error: errData?.error_user_msg || errData?.message || error.message });
+        logger.error(`[WhatsApp] ❌ Template "${def.name}" failed: ${JSON.stringify(errData || error.message)}`);
+      }
+    }
+
+    return {
+      success: true,
+      results,
+      created: results.filter(r => r.success).length,
+      failed: results.filter(r => !r.success).length,
+    };
   }
 
   /**
    * Check template status by trying to send to a test number
    * Returns which templates are working and which are missing
    */
-  async checkTemplateStatus() {
+  async checkTemplateStatus(tenantWhatsapp = null) {
     this.refreshCredentials();
     if (!this.isConfigured()) {
       return {
@@ -485,13 +755,15 @@ class WhatsAppService {
       };
     }
 
+    const purposes = ['invoice', 'statement', 'reminder', 'payment', 'restock'];
     const results = {};
-    const templateNames = Object.values(this.templates);
 
-    // We can't actually test without sending, so we just return the configured templates
-    // and provide instructions
-    for (const templateName of templateNames) {
-      results[templateName] = {
+    for (const purpose of purposes) {
+      const templateName = this.getTemplateName(purpose, tenantWhatsapp);
+      const lang = this.getTemplateLanguage(purpose, tenantWhatsapp);
+      results[purpose] = {
+        templateName,
+        language: lang,
         configured: true,
         status: 'unknown',
         message: 'للتحقق من حالة القالب، حاول إرساله لرقم اختبار',
@@ -501,44 +773,13 @@ class WhatsAppService {
     return {
       success: true,
       templates: results,
-      totalConfigured: templateNames.length,
+      totalConfigured: purposes.length,
+      wabaId: this.getWabaId(tenantWhatsapp),
       instructions: {
         ar: 'لإنشاء القوالب، اذهب إلى Meta Business Suite → WhatsApp Manager → Message Templates',
         en: 'To create templates, go to Meta Business Suite → WhatsApp Manager → Message Templates',
         url: 'https://business.facebook.com/wa/manage/message-templates/',
       },
-      requiredTemplates: [
-        {
-          name: 'invoice_notification',
-          priority: 'high',
-          description: 'فاتورة جديدة',
-          params: '{{1}}=customer_name, {{2}}=invoice_number, {{3}}=total_amount, {{4}}=payment_method',
-        },
-        {
-          name: 'customer_statement',
-          priority: 'medium',
-          description: 'كشف حساب العميل',
-          params: '{{1}}=customer_name, {{2}}=total_purchases, {{3}}=total_paid, {{4}}=outstanding',
-        },
-        {
-          name: 'payment_reminder',
-          priority: 'high',
-          description: 'تذكير بالقسط',
-          params: '{{1}}=customer_name, {{2}}=amount, {{3}}=due_date, {{4}}=invoice_number',
-        },
-        {
-          name: 'restock_request',
-          priority: 'low',
-          description: 'طلب إعادة تخزين',
-          params: '{{1}}=store_name, {{2}}=product_name, {{3}}=quantity, {{4}}=current_stock',
-        },
-        {
-          name: 'payment_received',
-          priority: 'medium',
-          description: 'تأكيد استلام دفعة',
-          params: '{{1}}=customer_name, {{2}}=amount, {{3}}=remaining, {{4}}=invoice_number',
-        },
-      ],
     };
   }
 
@@ -549,9 +790,9 @@ class WhatsAppService {
    * =====================================================
    */
 
-  async sendInvoiceNotification(phone, invoice, customer) {
+  async sendInvoiceNotification(phone, invoice, customer, tenantWhatsapp = null) {
     // Try template first
-    const templateResult = await this.sendInvoiceTemplate(phone, customer, invoice);
+    const templateResult = await this.sendInvoiceTemplate(phone, customer, invoice, tenantWhatsapp);
     if (templateResult.success) {
       return templateResult;
     }
@@ -579,14 +820,15 @@ class WhatsAppService {
     return this.sendMessage(phone, message);
   }
 
-  async sendInstallmentReminder(phone, customer, invoice, installment) {
+  async sendInstallmentReminder(phone, customer, invoice, installment, tenantWhatsapp = null) {
     // Try template first
     const templateResult = await this.sendPaymentReminderTemplate(
-      phone, 
-      customer, 
+      phone,
+      customer,
       installment.amount - installment.paidAmount,
       installment.dueDate,
-      invoice.invoiceNumber
+      invoice.invoiceNumber,
+      tenantWhatsapp
     );
     if (templateResult.success) {
       return templateResult;
@@ -628,7 +870,16 @@ class WhatsAppService {
     return this.sendMessage(phone, message);
   }
 
-  async sendRestockRequest(coordinatorPhone, product, requestedQuantity) {
+  async sendRestockRequest(coordinatorPhone, product, requestedQuantity, storeName = 'PayQusta', tenantWhatsapp = null) {
+    // Try restock_request template first (English)
+    const templateResult = await this.sendRestockTemplate(
+      coordinatorPhone, storeName, product, requestedQuantity, tenantWhatsapp
+    );
+    if (templateResult.success) {
+      return templateResult;
+    }
+
+    // Fallback to regular message
     let message = `📦 *طلب إعادة تخزين*\n\n`;
     message += `المنتج: *${product.name}*\n`;
     message += `الكمية المطلوبة: *${requestedQuantity}* ${product.stock.unit}\n`;
@@ -645,9 +896,9 @@ class WhatsAppService {
     return this.sendMessage(coordinatorPhone, message);
   }
 
-  async sendTransactionHistory(phone, customer, invoices) {
+  async sendTransactionHistory(phone, customer, invoices, tenantWhatsapp = null) {
     // Try statement template first
-    const templateResult = await this.sendStatementTemplate(phone, customer);
+    const templateResult = await this.sendStatementTemplate(phone, customer, tenantWhatsapp);
     if (templateResult.success) {
       return templateResult;
     }

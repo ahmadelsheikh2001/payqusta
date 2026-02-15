@@ -61,10 +61,10 @@ export default function NotificationDropdown() {
     let eventSource;
     let retryTimeout;
     let retryCount = 0;
-    let unmounted = false;
 
     const connect = () => {
-      if (unmounted) return;
+      if (document.hidden) return; // Don't connect if hidden
+
       try {
         eventSource = new EventSource(`/api/v1/notifications/stream?token=${token}`);
 
@@ -80,7 +80,6 @@ export default function NotificationDropdown() {
             setNotifications((prev) => [notification, ...prev].slice(0, 30));
             setUnreadCount((prev) => prev + 1);
 
-            // Browser notification
             if (window.Notification && window.Notification.permission === 'granted') {
               new window.Notification(notification.title, { body: notification.message, icon: '/favicon.svg' });
             }
@@ -89,8 +88,7 @@ export default function NotificationDropdown() {
 
         eventSource.onerror = () => {
           eventSource.close();
-          if (unmounted) return;
-          // Exponential backoff: 3s, 6s, 12s, max 30s
+          // Exponential backoff
           const delay = Math.min(3000 * Math.pow(2, retryCount), 30000);
           retryCount++;
           retryTimeout = setTimeout(connect, delay);
@@ -98,20 +96,54 @@ export default function NotificationDropdown() {
       } catch (e) {}
     };
 
-    connect();
+    // Initial connect if visible
+    if (!document.hidden) connect();
+
+    // Handle visibility change
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        eventSource?.close();
+        clearTimeout(retryTimeout);
+      } else {
+        connect();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
-      unmounted = true;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       clearTimeout(retryTimeout);
       eventSource?.close();
     };
   }, []);
 
   // Poll unread count every 30s
+  // Poll unread count periodically (every 60s), only if visible
   useEffect(() => {
-    fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 30000);
-    return () => clearInterval(interval);
+    let interval;
+
+    const startPolling = () => {
+      fetchUnreadCount();
+      interval = setInterval(fetchUnreadCount, 60000);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        clearInterval(interval);
+      } else {
+        startPolling();
+      }
+    };
+
+    if (!document.hidden) startPolling();
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(interval);
+    };
   }, [fetchUnreadCount]);
 
   // Load notifications when dropdown opens
