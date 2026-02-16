@@ -169,13 +169,14 @@ class InvoiceController {
         tenant: req.tenantId,
         invoiceNumber: Helpers.generateInvoiceNumber(),
         customer: customer._id,
-        createdBy: req.user._id,
+        createdBy: req.user ? req.user._id : null, // Support storefront guest checkout
         items: invoiceItems,
         subtotal,
         discount,
         totalAmount,
         paymentMethod,
         notes,
+        source: req.body.source || 'pos', // Track source
       };
 
       // Handle payment method

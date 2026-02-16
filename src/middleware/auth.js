@@ -80,7 +80,7 @@ const authorize = (...roles) => {
  * Ensures all queries are scoped to the current tenant
  */
 const tenantScope = (req, res, next) => {
-  if (!req.tenantId && req.user.role !== 'admin') {
+  if (!req.tenantId && req.user && req.user.role !== 'admin') {
     return next(AppError.badRequest('معرف المتجر مطلوب'));
   }
 
@@ -89,6 +89,43 @@ const tenantScope = (req, res, next) => {
   req.tenantFilter = req.tenantId ? { tenant: req.tenantId } : {};
 
   next();
+};
+
+/**
+ * Public Tenant Scope middleware
+ * For storefront routes that don't require authentication
+ */
+const publicTenantScope = async (req, res, next) => {
+  try {
+    // If already has tenantId (e.g. from protect), move on
+    if (req.tenantId) {
+      req.tenantFilter = { tenant: req.tenantId };
+      return next();
+    }
+
+    // Try to get tenant from header or query or slug
+    const tenantId = req.headers['x-tenant-id'] || req.query.tenant;
+    
+    let tenant;
+    if (tenantId) {
+      const Tenant = require('../models/Tenant');
+      tenant = await Tenant.findById(tenantId);
+    } else {
+      // For now, default to the first tenant if none specified
+      const Tenant = require('../models/Tenant');
+      tenant = await Tenant.findOne();
+    }
+
+    if (!tenant) {
+      return next(AppError.notFound('المتجر غير موجود'));
+    }
+
+    req.tenantId = tenant._id;
+    req.tenantFilter = { tenant: tenant._id };
+    next();
+  } catch (error) {
+    next(error);
+  }
 };
 
 /**
@@ -123,4 +160,4 @@ const auditLog = (action, resource) => {
   };
 };
 
-module.exports = { protect, authorize, tenantScope, auditLog };
+module.exports = { protect, authorize, tenantScope, publicTenantScope, auditLog };

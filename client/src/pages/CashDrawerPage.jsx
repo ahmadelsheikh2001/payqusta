@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { api } from '../store';
 import { toast } from 'react-hot-toast';
 import { DollarSign, Clock, Lock, CheckCircle, AlertTriangle, History } from 'lucide-react';
 import { Button, Card, Input, Modal, LoadingSpinner, EmptyState, Badge } from '../components/UI';
@@ -24,8 +24,8 @@ export default function CashDrawerPage() {
     setLoading(true);
     try {
       const [currentRes, historyRes] = await Promise.all([
-        axios.get('/api/v1/cash-shifts/current'),
-        axios.get(`/api/v1/cash-shifts/history?page=${page}&limit=10`)
+        api.get('/cash-shifts/current'),
+        api.get(`/cash-shifts/history?page=${page}&limit=10`)
       ]);
       setActiveShift(currentRes.data.data);
       setHistory(historyRes.data.data);
@@ -43,7 +43,7 @@ export default function CashDrawerPage() {
 
   const handleOpenShift = async () => {
     try {
-      await axios.post('/api/v1/cash-shifts/open', { openingBalance: Number(openingBalance) });
+      await api.post('/cash-shifts/open', { openingBalance: Number(openingBalance) });
       toast.success('تم فتح الوردية');
       setShowOpenModal(false);
       fetchDat();
@@ -54,7 +54,7 @@ export default function CashDrawerPage() {
 
   const handleCloseShift = async () => {
     try {
-      await axios.post('/api/v1/cash-shifts/close', { 
+      await api.post('/cash-shifts/close', { 
         actualCash: Number(closingForm.actualCash),
         notes: closingForm.notes
       });

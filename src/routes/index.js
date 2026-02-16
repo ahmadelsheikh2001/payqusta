@@ -48,6 +48,26 @@ router.post('/auth/login', authController.login);
 router.post('/auth/forgot-password', authController.forgotPassword);
 router.post('/auth/reset-password/:token', authController.resetPassword);
 
+// ============ PUBLIC STOREFRONT ROUTES ============
+router.get('/settings', publicTenantScope, settingsController.getSettings);
+router.get('/products', publicTenantScope, productController.getAll);
+router.get('/products/categories', publicTenantScope, productController.getCategories);
+router.get('/products/:id', publicTenantScope, productController.getById);
+router.get('/products/barcode/:code', publicTenantScope, productController.getByBarcode);
+
+// Public Checkout Routes (Restricted logic handled in controllers)
+router.post('/customers', (req, res, next) => {
+  // Only allow public creation if it's from storefront
+  if (req.headers['x-source'] === 'online_store') return next();
+  protect(req, res, next);
+}, publicTenantScope, customerController.create);
+
+router.post('/invoices', (req, res, next) => {
+  // Only allow public creation if it's from storefront
+  if (req.body.source === 'online_store') return next();
+  protect(req, res, next);
+}, publicTenantScope, invoiceController.create);
+
 // ============ PROTECTED ROUTES ============
 router.use(protect); // All routes below require authentication
 router.use(tenantScope); // All routes below are tenant-scoped
@@ -88,9 +108,9 @@ router.get('/dashboard/customer-lifetime-value', authorize('vendor', 'admin'), d
 router.get('/products', productController.getAll);
 router.get('/products/low-stock', authorize('vendor', 'admin', 'coordinator'), productController.getLowStock);
 router.get('/products/summary', authorize('vendor', 'admin', 'coordinator'), productController.getStockSummary);
-router.get('/products/categories', productController.getCategories);
-router.get('/products/barcode/:code', productController.getByBarcode); // Search by barcode/SKU
-router.get('/products/:id', productController.getById);
+// router.get('/products/categories', productController.getCategories); // Moved to public
+// router.get('/products/barcode/:code', productController.getByBarcode); // Moved to public
+// router.get('/products/:id', productController.getById); // Moved to public
 router.post('/products', authorize('vendor', 'admin'), checkLimit('product'), auditLog('create', 'product'), productController.create);
 router.put('/products/:id', authorize('vendor', 'admin'), auditLog('update', 'product'), productController.update);
 router.delete('/products/:id', authorize('vendor', 'admin'), auditLog('delete', 'product'), productController.delete);
@@ -106,7 +126,7 @@ router.get('/customers/:id', authorize('vendor', 'admin', 'coordinator'), custom
 router.get('/customers/:id/transactions', authorize('vendor', 'admin', 'coordinator'), customerController.getTransactionHistory);
 router.get('/customers/:id/statement-pdf', authorize('vendor', 'admin', 'coordinator'), customerController.getStatementPDF);
 router.get('/customers/:id/credit-assessment', authorize('vendor', 'admin', 'coordinator'), customerController.getCreditAssessment);
-router.post('/customers', authorize('vendor', 'admin'), auditLog('create', 'customer'), customerController.create);
+// router.post('/customers' ... ) // Moved to public/conditional above
 router.post('/customers/:id/send-statement', authorize('vendor', 'admin'), customerController.sendStatement);
 router.post('/customers/:id/send-statement-pdf', authorize('vendor', 'admin', 'coordinator'), customerController.sendStatementPDF);
 router.post('/customers/:id/block-sales', authorize('vendor', 'admin'), customerController.blockSales);
@@ -135,7 +155,7 @@ router.get('/invoices/overdue', authorize('vendor', 'admin', 'coordinator'), inv
 router.get('/invoices/upcoming-installments', authorize('vendor', 'admin', 'coordinator'), invoiceController.getUpcomingInstallments);
 router.get('/invoices/sales-summary', authorize('vendor', 'admin', 'coordinator'), invoiceController.getSalesSummary);
 router.get('/invoices/:id', authorize('vendor', 'admin', 'coordinator'), invoiceController.getById);
-router.post('/invoices', authorize('vendor', 'admin', 'coordinator'), auditLog('invoice', 'invoice'), invoiceController.create);
+// router.post('/invoices' ...) // Moved to public/conditional above
 router.post('/invoices/send-whatsapp-message', authorize('vendor', 'admin', 'coordinator'), invoiceController.sendWhatsAppMessage);
 router.post('/invoices/:id/pay', authorize('vendor', 'admin', 'coordinator'), auditLog('payment', 'invoice'), invoiceController.recordPayment);
 router.post('/invoices/:id/pay-all', authorize('vendor', 'admin'), auditLog('payment', 'invoice'), invoiceController.payAll);
@@ -174,7 +194,7 @@ router.get('/bi/real-profit', authorize('vendor', 'admin'), biController.getReal
 router.post('/bi/what-if', authorize('vendor', 'admin'), biController.whatIfSimulator);
 
 // --- Settings ---
-router.get('/settings', settingsController.getSettings);
+// router.get('/settings', settingsController.getSettings); // Moved to public
 router.put('/settings/store', authorize('vendor', 'admin'), settingsController.updateStore);
 router.put('/settings/whatsapp', authorize('vendor', 'admin'), settingsController.updateWhatsApp);
 router.post('/settings/whatsapp/test', authorize('vendor', 'admin'), settingsController.testWhatsApp);

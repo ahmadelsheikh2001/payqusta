@@ -153,7 +153,7 @@ class OfflineSync {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+            'Authorization': `Bearer ${localStorage.getItem('payqusta_token')}`
           },
           body: JSON.stringify(invoice.data)
         });

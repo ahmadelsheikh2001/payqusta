@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { api } from '../store';
 import { toast } from 'react-hot-toast';
 import { Plus, Archive, AlertTriangle, Check, Search, X } from 'lucide-react';
 import { Button, Card, Input, Modal, LoadingSpinner, EmptyState, Select, Badge } from '../components/UI';
@@ -29,7 +29,7 @@ export default function StockAdjustmentsPage() {
   const fetchAdjustments = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`/api/v1/stock-adjustments?page=${page}&limit=10`);
+      const res = await api.get(`/stock-adjustments?page=${page}&limit=10`);
       setAdjustments(res.data.data);
       setTotalPages(res.data.pagination.totalPages);
     } catch (err) {
@@ -41,7 +41,7 @@ export default function StockAdjustmentsPage() {
 
   const fetchProducts = async () => {
     try {
-      const res = await axios.get('/api/v1/products?limit=1000'); // Get enough for search
+      const res = await api.get('/products?limit=1000'); // Get enough for search
       setProducts(res.data.data);
     } catch (err) {}
   };
@@ -55,7 +55,7 @@ export default function StockAdjustmentsPage() {
     if (!form.productId || !form.quantity) return toast.error('اختر المنتج والكمية');
     
     try {
-      await axios.post('/api/v1/stock-adjustments', form);
+      await api.post('/stock-adjustments', form);
       toast.success('تم تسجيل التسوية بنجاح');
       setShowModal(false);
       fetchAdjustments();

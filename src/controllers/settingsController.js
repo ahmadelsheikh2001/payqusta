@@ -18,7 +18,7 @@ class SettingsController {
       const tenant = await Tenant.findById(req.tenantId);
       if (!tenant) return next(AppError.notFound('المتجر غير موجود'));
 
-      const user = await User.findById(req.user._id).select('-password');
+      const user = req.user ? await User.findById(req.user._id).select('-password') : null;
 
       ApiResponse.success(res, {
         tenant: {
@@ -29,15 +29,45 @@ class SettingsController {
           settings: tenant.settings,
           branding: tenant.branding,
           subscription: tenant.subscription,
-          whatsapp: tenant.whatsapp,
+          whatsapp: req.user ? tenant.whatsapp : undefined, // Only show WhatsApp full config to logged in users
         },
-        user: {
+        user: user ? {
           _id: user._id,
           name: user.name,
           email: user.email,
           phone: user.phone,
           role: user.role,
-        },
+        } : null,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/v1/storefront/settings
+   * Get public settings for the storefront
+   */
+  async getStorefrontSettings(req, res, next) {
+    try {
+      // Find the first active tenant or by slug if provided
+      const tenantId = req.query.tenant || req.headers['x-tenant-id'];
+      let tenant;
+      
+      if (tenantId) {
+        tenant = await Tenant.findById(tenantId);
+      } else {
+        tenant = await Tenant.findOne(); // Get default for now
+      }
+
+      if (!tenant) return next(AppError.notFound('المتجر غير موجود'));
+
+      ApiResponse.success(res, {
+        name: tenant.name,
+        businessInfo: tenant.businessInfo,
+        branding: tenant.branding,
+        currency: 'EGP', // Default
+        taxRate: 14 // Default
       });
     } catch (error) {
       next(error);
