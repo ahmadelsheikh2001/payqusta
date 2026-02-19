@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Tag, Save, Plus, Trash2, Loader } from 'lucide-react';
+import { Tag, Save, Plus, Trash2, Loader } from 'lucide-react'; // Removed Eye, EyeOff
 import { api, productsApi } from '../../store';
 import { Button, Input } from '../UI';
 import { notify } from '../AnimatedNotification';

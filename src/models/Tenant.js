@@ -52,9 +52,12 @@ const tenantSchema = new mongoose.Schema(
       lowStockThreshold: { type: Number, default: 5 },
       autoRestockAlert: { type: Boolean, default: true },
       enableGamification: { type: Boolean, default: true },
-      categories: { 
-        type: [String], 
-        default: [] // Start with empty categories for true isolation
+      categories: {
+        type: [{
+          name: String,
+          isVisible: { type: Boolean, default: true }
+        }],
+        default: []
       },
     },
     // WhatsApp configuration

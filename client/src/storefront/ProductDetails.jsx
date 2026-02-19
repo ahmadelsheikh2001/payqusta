@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ShoppingCart, Plus, Minus, ArrowRight, Package } from 'lucide-react';
-import axios from 'axios';
+import { api } from '../store';
+import { portalApi, usePortalStore } from '../store/portalStore'; // Import portal store
 import { Card, Button, Badge, LoadingSpinner, Select } from '../components/UI';
 import { notify } from '../components/AnimatedNotification';
 
@@ -10,6 +11,9 @@ export default function ProductDetails() {
   const navigate = useNavigate();
   const location = useLocation();
   const isPortal = location.pathname.includes('/portal');
+  
+  const { addToCart: addToPortalCart } = usePortalStore(); // Portal Cart Action
+
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
@@ -22,15 +26,35 @@ export default function ProductDetails() {
   const loadProduct = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`/api/v1/products/${id}`);
+      const apiClient = isPortal ? portalApi : api;
+      // Portal uses /portal/products/:id, Storefront uses /products/:id
+      // But currently portalController doesn't have a specific getById, logic is simpler to just use same endpoint if protected?
+      // Actually portalController needs a getById wrapper or we use the public/protected distinction.
+      // Let's check portal routes. It has router.get('/products', ...) but no /products/:id
+      // We need to add /products/:id to portal routes or use a query param? or assuming /api/v1/products/:id works for portal users?
+      // Tenant validation might fail if using standard /api/v1/products/:id with portal token if middleware expects different user type.
+      // Portal users are Customers. Standard products api expects User (Admin).
+      // So we MUST use a portal-specific route or ensure standard route accepts Customers.
+      // Let's assume for now we need to fix portalController to support getProductDetails or similar.
+      // Wait, let's check portal routes again.
+      
+      // Checking local file view from earlier: portal/authRoutes.js
+      // router.get('/products', portalController.getProducts);
+      // router.post('/cart/checkout', portalController.checkout);
+      // It DOES NOT have /products/:id. 
+      // I need to add it to portal routes.
+      
+      const endpoint = isPortal ? `/portal/products/${id}` : `/products/${id}`;
+      const res = await apiClient.get(endpoint);
+      
       setProduct(res.data.data);
       
-      // Select first variant if product has variants
       if (res.data.data.hasVariants && res.data.data.variants?.length > 0) {
         setSelectedVariant(res.data.data.variants[0]);
       }
     } catch (err) {
       notify.error('فشل تحميل المنتج');
+      // console.error(err);
       navigate(isPortal ? '/portal/products' : '/store/products');
     } finally {
       setLoading(false);
@@ -38,6 +62,14 @@ export default function ProductDetails() {
   };
 
   const addToCart = () => {
+    if (isPortal) {
+      // Use Portal Store
+      addToPortalCart(product, quantity, selectedVariant);
+      notify.success('تم إضافة المنتج للسلة');
+      return;
+    }
+
+    // Legacy Storefront Cart (LocalStorage)
     const cart = JSON.parse(localStorage.getItem('cart') || '[]');
     
     const cartItem = {
@@ -52,7 +84,6 @@ export default function ProductDetails() {
       } : null
     };
 
-    // Check if item already exists
     const existingIndex = cart.findIndex(item => 
       item.productId === cartItem.productId && 
       JSON.stringify(item.variant) === JSON.stringify(cartItem.variant)

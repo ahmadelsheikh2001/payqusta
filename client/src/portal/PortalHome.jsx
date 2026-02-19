@@ -1,13 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { usePortalStore } from "../store/portalStore";
-import { Card, LoadingSpinner, Badge, Button } from "../components/UI";
-import { CreditCard, Calendar, ArrowLeft, ShoppingBag, Receipt, AlertCircle } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+import { usePortalStore } from '../store/portalStore';
+import { useThemeStore } from '../store';
+import {
+  CreditCard, Calendar, ArrowLeft, ShoppingBag, Receipt, FileText,
+  User, Star, Search, Filter, ShoppingCart, Heart, Bell, Menu,
+  ChevronRight, ArrowRight, Tag, Zap, ShieldCheck
+} from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { LoadingSpinner } from '../components/UI';
 
 export default function PortalHome() {
-  const { fetchDashboard, loading } = usePortalStore();
+  const { fetchDashboard, loading, customer, addToCart } = usePortalStore(); // Added addToCart
+  const { dark } = useThemeStore();
   const [data, setData] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     loadData();
@@ -18,110 +24,199 @@ export default function PortalHome() {
     if (res) setData(res);
   };
 
-  if (loading || !data) return <LoadingSpinner />;
+  if (loading || !data) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <LoadingSpinner size="lg" />
+        <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">جاري تجهيز المتجر...</p>
+      </div>
+    );
+  }
 
-  const { wallet, upcomingInstallments, recentOrders, profile } = data;
-  
-  // Wallet Pie Data
-  const pieData = [
-    { name: 'مستخدم', value: wallet.usedCredit, color: '#ef4444' }, // Red
-    { name: 'متاح', value: wallet.availableCredit, color: '#22c55e' }, // Green
-  ];
+  const { wallet, upcomingInstallments, categories, products, store } = data;
+  const currencyLabel = wallet?.currency === 'EGP' ? 'ج.م' : wallet?.currency;
+
+  // Dynamic colors
+  const primaryColor = store?.primaryColor || '#6366f1';
+  const secondaryColor = store?.secondaryColor || '#10b981';
 
   return (
-    <div className="space-y-6 pb-20">
-      {/* Credit Wallet Card */}
-      <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 blur-2xl"></div>
-        <div className="absolute bottom-0 left-0 w-24 h-24 bg-primary-500/20 rounded-full -ml-10 -mb-10 blur-xl"></div>
-        
-        <div className="relative z-10">
-          <div className="flex justify-between items-start mb-6">
-            <div>
-              <p className="text-gray-400 text-sm mb-1">الرصيد المتاح للشراء</p>
-              <h2 className="text-4xl font-black tracking-tight">
-                {wallet.availableCredit.toLocaleString()} <span className="text-lg font-medium text-gray-400">{wallet.currency}</span>
-              </h2>
-            </div>
-            <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-sm">
-              <CreditCard className="w-6 h-6 text-primary-400" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 mt-8">
-            <div className="bg-white/5 p-3 rounded-xl backdrop-blur-sm">
-              <p className="text-xs text-gray-400 mb-1">إجمالي الحد الائتماني</p>
-              <p className="font-bold">{wallet.creditLimit.toLocaleString()}</p>
-            </div>
-            <div className="bg-white/5 p-3 rounded-xl backdrop-blur-sm">
-              <p className="text-xs text-gray-400 mb-1">المستخدم حالياً</p>
-              <p className="font-bold text-red-400">{wallet.usedCredit.toLocaleString()}</p>
-            </div>
-          </div>
-          
-          <Link to="/portal/products">
-            <Button className="w-full mt-6 bg-primary-600 hover:bg-primary-500 text-white border-none">
-              تسوق الآن واستخدم رصيدك <ArrowLeft className="w-4 h-4 mr-2" />
-            </Button>
-          </Link>
-        </div>
-      </div>
-
-      {/* Upcoming Installments */}
-      <div>
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="font-bold text-lg flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-gray-400" />
-            أقساط مستحقة
-          </h3>
-          {upcomingInstallments.length > 0 && (
-             <Badge variant="warning">{upcomingInstallments.length} قسط</Badge>
-          )}
-        </div>
-
-        {upcomingInstallments.length === 0 ? (
-           <Card className="p-8 text-center bg-white border-2 border-dashed border-gray-200">
-             <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-               <Receipt className="w-6 h-6 text-green-600" />
-             </div>
-             <p className="text-gray-500 text-sm">لا توجد أقساط مستحقة قريباً</p>
-           </Card>
-        ) : (
-          <div className="space-y-3">
-            {upcomingInstallments.map((inst, idx) => (
-              <Card key={idx} className="p-4 flex justify-between items-center border-l-4 border-l-orange-400">
-                <div>
-                  <p className="font-bold text-gray-800">فاتورة #{inst.invoiceNumber}</p>
-                  <p className="text-xs text-gray-500 mt-1">تستحق في {new Date(inst.dueDate).toLocaleDateString('ar-EG')}</p>
-                </div>
-                <div className="text-left">
-                  <p className="font-black text-lg text-orange-600">{inst.amount.toLocaleString()} ج.م</p>
-                  <span className="text-[10px] bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
-                    قسط {inst.installmentNumber}
-                  </span>
-                </div>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
+    <div className="pb-24 animate-fade-in space-y-6" dir="rtl">
       
-      {/* Quick Actions */}
-      <div className="grid grid-cols-2 gap-4">
-        <Link to="/portal/products" className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center text-center hover:bg-gray-50 transition-colors">
-          <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mb-2 text-blue-600">
-            <ShoppingBag className="w-5 h-5" />
+      {/* ═══════════════ SEARCH & HERO ═══════════════ */}
+      <div className="space-y-4">
+        {/* Search Bar */}
+        <div className="relative">
+          <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <input 
+            type="text"
+            placeholder="عن ماذا تبحث اليوم؟"
+            className="w-full bg-white dark:bg-gray-800 border-none rounded-2xl py-4 pr-12 pl-4 shadow-sm focus:ring-2 focus:ring-primary-500/20 text-sm transition-all"
+            readOnly // For now
+            onClick={() => navigate('/portal/products')}
+          />
+        </div>
+
+        {/* Hero Banner */}
+        <div className="relative rounded-[2rem] overflow-hidden shadow-xl h-56 md:h-80 group">
+          <div 
+            className="absolute inset-0 bg-cover bg-center transition-transform duration-1000 group-hover:scale-105"
+            style={{ 
+              backgroundImage: `url(${store?.coverImage || 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=800&q=80'})`,
+            }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/20 to-transparent" />
+          
+          <div className="absolute inset-0 p-8 flex flex-col justify-center items-start text-white max-w-lg">
+             <span className="bg-white/20 backdrop-blur-md text-white text-xs font-bold px-3 py-1 rounded-full mb-4 border border-white/10">
+               عروض حصرية
+             </span>
+             <h1 className="text-3xl md:text-5xl font-black mb-4 leading-tight">
+               موسم <br/>
+               <span style={{ color: secondaryColor }}>التخفيضات</span> الكبرى
+             </h1>
+             <p className="text-white/80 mb-6 text-sm font-medium line-clamp-2 max-w-xs hidden md:block">
+               استخدم رصيدك المتاح وتمتع بتقسيط مريح على جميع المنتجات الجديدة.
+             </p>
+             <button 
+               onClick={() => navigate('/portal/products')}
+               className="bg-white text-black px-6 py-3 rounded-xl font-bold text-sm hover:bg-gray-100 transition-colors shadow-lg shadow-white/10 flex items-center gap-2"
+             >
+               تسوق الآن <ArrowLeft className="w-4 h-4" />
+             </button>
           </div>
-          <span className="font-bold text-sm">تصفح المنتجات</span>
-        </Link>
-        <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center text-center opacity-50 cursor-not-allowed">
-           <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center mb-2 text-purple-600">
-            <Receipt className="w-5 h-5" />
-          </div>
-          <span className="font-bold text-sm">سداد قسط (قريباً)</span>
         </div>
       </div>
 
+      {/* ═══════════════ CATEGORIES ═══════════════ */}
+      <div>
+        <div className="flex items-center justify-between px-2 mb-4">
+          <h3 className="font-bold text-lg dark:text-white">تصفح الأقسام</h3>
+          <Link to="/portal/products" className="text-xs font-bold text-primary-600">عرض الكل</Link>
+        </div>
+        <div className="flex gap-4 overflow-x-auto px-2 pb-4 no-scrollbar">
+           {categories?.length > 0 ? categories.map((cat, i) => (
+             <Link key={i} to={`/portal/products?category=${cat.slug}`} className="flex flex-col items-center gap-2 group min-w-[80px]">
+               <div className="w-20 h-20 rounded-2xl bg-white dark:bg-gray-800 p-1 group-hover:bg-primary-50 transition-colors border border-gray-100 dark:border-gray-700 group-hover:border-primary-200 shadow-sm flex items-center justify-center">
+                 {/* Since we don't have real category images yet, use a nice icon/placeholder */}
+                 <div className="w-full h-full rounded-xl bg-gray-50 dark:bg-gray-700/50 flex items-center justify-center text-primary-500 overflow-hidden">
+                    {/* If we had images: <img ... /> */}
+                    <Tag className="w-8 h-8 opacity-70 group-hover:scale-110 transition-transform" />
+                 </div>
+               </div>
+               <span className="text-xs font-bold text-gray-700 dark:text-gray-300 group-hover:text-primary-600 text-center line-clamp-1">{cat.name}</span>
+             </Link>
+           )) : (
+             <div className="w-full text-center py-4 text-gray-400 text-xs">لا توجد أقسام متاحة</div>
+           )}
+        </div>
+      </div>
+
+      {/* ═══════════════ FEATURED PRODUCTS GRID ═══════════════ */}
+      <div className="bg-gray-50 dark:bg-gray-800/50 -mx-4 px-4 py-8 rounded-t-[2.5rem]">
+         <div className="flex items-center justify-between mb-6">
+           <h3 className="font-black text-xl dark:text-white flex items-center gap-2">
+             <Zap className="w-5 h-5 text-yellow-500 fill-yellow-500" />
+             منتجات مختارة لك
+           </h3>
+         </div>
+
+         {!products?.length ? (
+           <div className="text-center py-10 opacity-60">
+             <ShoppingBag className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+             <p className="text-sm font-medium">لا توجد منتجات متاحة حالياً</p>
+           </div>
+         ) : (
+           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+             {products.map((product, i) => (
+               <div key={i} className="bg-white dark:bg-gray-800 rounded-3xl p-3 shadow-sm hover:shadow-xl hover:shadow-primary-500/10 transition-all duration-300 group">
+                 {/* Image */}
+                 <div className="aspect-[4/5] bg-gray-100 dark:bg-gray-700 rounded-2xl mb-3 relative overflow-hidden cursor-pointer" onClick={() => navigate(`/portal/products/${product.slug}`)}>
+                    {product.images?.[0] ? (
+                      <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-gray-300">
+                        <Package className="w-10 h-10" />
+                      </div>
+                    )}
+                    
+                    {/* Floating Add Btn */}
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        addToCart(product);
+                      }}
+                      className="absolute bottom-3 right-3 w-10 h-10 bg-white dark:bg-gray-900 rounded-full shadow-lg flex items-center justify-center text-gray-900 dark:text-white hover:bg-primary-600 hover:text-white transition-colors transform translate-y-12 group-hover:translate-y-0 duration-300 z-10"
+                    >
+                      <ShoppingBag className="w-5 h-5" />
+                    </button>
+
+                    {/* Wishlist */}
+                    <button className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/50 backdrop-blur-sm flex items-center justify-center text-gray-600 hover:text-red-500 transition-colors">
+                      <Heart className="w-4 h-4" />
+                    </button>
+                 </div>
+
+                 {/* Details */}
+                 <div className="px-1">
+                   <div className="flex justify-between items-start mb-1 h-10">
+                      <h4 className="font-bold text-sm text-gray-900 dark:text-white line-clamp-2 leading-snug cursor-pointer" onClick={() => navigate(`/portal/products/${product.slug}`)}>{product.name}</h4>
+                   </div>
+                   <div className="flex items-end justify-between mt-2">
+                     <div>
+                       <p className="text-[10px] text-gray-400 line-through decoration-red-400">{(product.price * 1.2).toLocaleString()}</p>
+                       <p className="text-lg font-black text-gray-900 dark:text-white">{product.price.toLocaleString()} <span className="text-[10px] text-gray-500 font-normal">{currencyLabel}</span></p>
+                     </div>
+                   </div>
+                 </div>
+               </div>
+             ))}
+           </div>
+         )}
+
+         <div className="mt-8 text-center">
+           <Link to="/portal/products" className="inline-flex items-center gap-2 text-sm font-bold text-white bg-black dark:bg-gray-700 px-8 py-4 rounded-2xl hover:bg-gray-800 transition-colors">
+             عرض كل المنتجات <ArrowRight className="w-4 h-4" />
+           </Link>
+         </div>
+      </div>
+
+      {/* ═══════════════ UPCOMING PAYMENTS (Mini) ═══════════════ */}
+      {upcomingInstallments?.length > 0 && (
+        <div className="px-1">
+          <div className="bg-orange-50 dark:bg-orange-900/10 rounded-3xl p-6 border border-orange-100 dark:border-orange-800/30">
+            <div className="flex items-center gap-3 mb-4">
+               <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-800/20 flex items-center justify-center text-orange-600">
+                 <Calendar className="w-5 h-5" />
+               </div>
+               <div>
+                 <h3 className="font-bold text-gray-900 dark:text-white">تذكير بالدفع</h3>
+                 <p className="text-xs text-cool-gray-500">لديك أقساط مستحقة قريباً</p>
+               </div>
+            </div>
+            
+            <div className="space-y-3">
+               {upcomingInstallments.slice(0, 2).map((inst, i) => (
+                 <div key={i} className="bg-white dark:bg-gray-800 p-3 rounded-2xl flex items-center justify-between shadow-sm">
+                    <div className="flex items-center gap-3">
+                      <span className="font-bold text-lg text-gray-900 dark:text-white">{new Date(inst.dueDate).getDate()}</span>
+                      <div className="flex flex-col">
+                        <span className="text-xs font-bold">قسط مستحق</span>
+                        <span className="text-[10px] text-gray-500">{new Date(inst.dueDate).toLocaleDateString('ar-EG')}</span>
+                      </div>
+                    </div>
+                    <span className="font-black text-orange-600">{inst.amount.toLocaleString()} {currencyLabel}</span>
+                 </div>
+               ))}
+               
+               <Link to="/portal/invoices" className="block text-center text-xs font-bold text-orange-600 mt-2 hover:underline">
+                 عرض كل الأقساط
+               </Link>
+            </div>
+          </div>
+        </div>
+      )}
+      
     </div>
   );
 }

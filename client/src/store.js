@@ -27,7 +27,10 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('payqusta_token');
-      window.location.href = '/login';
+      // Only redirect to admin login if NOT in portal
+      if (!window.location.pathname.startsWith('/portal')) {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
@@ -82,7 +85,7 @@ export const useAuthStore = create((set, get) => ({
   getMe: async () => {
     // Return existing promise if request is already in flight
     if (get().loadingUser) return;
-    
+
     set({ loadingUser: true });
     try {
       const { data } = await api.get('/auth/me');
@@ -110,14 +113,14 @@ export const useAuthStore = create((set, get) => ({
     try {
       const { data } = await api.post('/auth/switch-tenant', { tenantId });
       localStorage.setItem('payqusta_token', data.data.token);
-      
+
       // Reload user with new token
       const meRes = await api.get('/auth/me');
-      set({ 
+      set({
         token: data.data.token,
-        user: meRes.data.data.user, 
+        user: meRes.data.data.user,
         tenant: meRes.data.data.tenant,
-        loading: false 
+        loading: false
       });
       window.location.href = '/'; // Refresh to clear any stale state
     } catch (error) {

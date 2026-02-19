@@ -24,7 +24,7 @@ class SettingsController {
     const user = req.user ? await User.findById(req.user._id).select('-password') : null;
 
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-    
+
     ApiResponse.success(res, {
       tenant: {
         _id: tenant._id,
@@ -54,7 +54,7 @@ class SettingsController {
     // Find the first active tenant or by slug if provided
     const tenantId = req.query.tenant || req.headers['x-tenant-id'];
     let tenant;
-    
+
     if (tenantId) {
       tenant = await Tenant.findById(tenantId);
     } else {
@@ -228,7 +228,7 @@ class SettingsController {
 
     // Get current config info
     const tenant = await Tenant.findById(req.tenantId);
-    
+
     // Check if configured
     if (!WhatsAppService.isConfigured(tenant?.whatsapp)) {
       return ApiResponse.success(res, {
@@ -288,7 +288,7 @@ class SettingsController {
     // Get tenant whatsapp config for dynamic WABA_ID and template names
     const wabaId = tenantWhatsapp?.wabaId; // Removed fallback to process.env.WABA_ID for isolation
     // Assuming WabaId is strictly from tenant now, or enforced via setup
-    
+
     // Fetch real templates from Meta
     const result = await WhatsAppService.getTemplates(wabaId, tenantWhatsapp);
 
@@ -305,7 +305,7 @@ class SettingsController {
    */
   createWhatsAppTemplates = catchAsync(async (req, res, next) => {
     const tenant = await Tenant.findById(req.tenantId);
-    
+
     if (!WhatsAppService.isConfigured(tenant?.whatsapp)) {
       return ApiResponse.success(res, {
         success: false,
@@ -406,15 +406,34 @@ class SettingsController {
       return next(AppError.badRequest('يجب أن تكون الفئات قائمة'));
     }
 
-    // Filter unique and valid strings
-    const validCategories = [...new Set(categories.filter(c => typeof c === 'string' && c.trim().length > 0))];
+    // Filter unique and valid categories (Support strings and objects)
+    const validCategories = categories
+      .filter(c => {
+        if (typeof c === 'string') return c.trim().length > 0;
+        return c.name && typeof c.name === 'string' && c.name.trim().length > 0;
+      })
+      .map(c => {
+        if (typeof c === 'string') return { name: c.trim(), isVisible: true };
+        return { name: c.name.trim(), isVisible: c.isVisible !== false };
+      });
+
+    // Deduplicate by name
+    const uniqueCategories = [];
+    const seen = new Set();
+
+    for (const cat of validCategories) {
+      if (!seen.has(cat.name)) {
+        seen.add(cat.name);
+        uniqueCategories.push(cat);
+      }
+    }
 
     const tenant = await Tenant.findByIdAndUpdate(
       req.tenantId,
-      { 'settings.categories': validCategories },
+      { 'settings.categories': uniqueCategories },
       { new: true, runValidators: true }
     );
-    
+
     console.log(`[UPDATE_CATS] Tenant ${req.tenantId} updated categories to:`, tenant.settings.categories);
 
     if (!tenant) return next(AppError.notFound('المتجر غير موجود'));
@@ -439,7 +458,7 @@ class SettingsController {
     // We import Product model inside method to avoid circular dependency issues if any
     const Product = require('../models/Product');
     const fallbackCategory = 'أخرى';
-    
+
     const productUpdate = await Product.updateMany(
       { category: decodedCategory, ...req.tenantFilter },
       { category: fallbackCategory }
@@ -456,9 +475,9 @@ class SettingsController {
 
     if (!tenant) return next(AppError.notFound('المتجر غير موجود'));
 
-    ApiResponse.success(res, { 
+    ApiResponse.success(res, {
       categories: tenant.settings.categories,
-      affectedProducts: productUpdate.modifiedCount 
+      affectedProducts: productUpdate.modifiedCount
     }, `تم حذف التصنيف "${decodedCategory}" وتحويل ${productUpdate.modifiedCount} منتج إلى "${fallbackCategory}"`);
   });
 }

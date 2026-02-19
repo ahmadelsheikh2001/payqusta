@@ -54,6 +54,9 @@ import OrderConfirmation from './storefront/OrderConfirmation';
 import PortalLogin from './portal/PortalLogin';
 import PortalLayout from './portal/PortalLayout';
 import PortalHome from './portal/PortalHome';
+import PortalInvoices from './portal/PortalInvoices';
+import PortalStatement from './portal/PortalStatement';
+import PortalProfile from './portal/PortalProfile';
 
 
 // Protected Route wrapper
@@ -203,17 +206,6 @@ export default function App() {
         <InstallPrompt />
         
         <Routes>
-          <Route path="/login" element={
-            isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />
-          } />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
-          <Route path="/*" element={
-            <ProtectedRoute>
-              <MainLayout />
-            </ProtectedRoute>
-          } />
-
           {/* Customer Portal Routes */}
           <Route path="/portal/login" element={
             /* If we had a portal specific auth check in store, we could redirect if logged in. 
@@ -222,17 +214,30 @@ export default function App() {
             <PortalLogin />
           } />
           
-          <Route path="/portal" element={
-            /* PortalLayout should check for customer token/auth */
-            <PortalLayout />
-          }>
+          <Route path="/portal" element={<PortalLayout />}>
              <Route index element={<Navigate to="dashboard" replace />} />
              <Route path="dashboard" element={<PortalHome />} />
-             <Route path="products" element={<ProductCatalog />} /> 
+             <Route path="invoices" element={<PortalInvoices />} />
+             <Route path="statement" element={<PortalStatement />} />
+             <Route path="profile" element={<PortalProfile />} />
+             <Route path="products" element={<ProductCatalog />} />
              <Route path="products/:id" element={<ProductDetails />} />
              <Route path="cart" element={<ShoppingCart />} />
              <Route path="checkout" element={<Checkout />} />
           </Route>
+
+          <Route path="/login" element={
+            isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />
+          } />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+          
+          {/* Main App Routes (Protected) - Must be last */}
+          <Route path="/*" element={
+            <ProtectedRoute>
+              <MainLayout />
+            </ProtectedRoute>
+          } />
         </Routes>
       </BrowserRouter>
     </div>

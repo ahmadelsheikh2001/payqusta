@@ -19,7 +19,7 @@ const PLANS = {
       stores: 2,
       products: 500,
       users: 5,
-      invoices: 1000, 
+      invoices: 1000,
     },
     features: ['basic_reports', 'pos', 'whatsapp_notifications'],
   },
@@ -28,6 +28,17 @@ const PLANS = {
     limits: {
       stores: 5,
       products: 10000, // Effectively unlimited for most
+      users: 10,
+      invoices: 10000,
+    },
+    features: ['advanced_reports', 'pos', 'whatsapp_notifications', 'multi_branch'],
+  },
+  // Alias for backward compatibility
+  pro: {
+    name: 'احترافي',
+    limits: {
+      stores: 5,
+      products: 10000,
       users: 10,
       invoices: 10000,
     },

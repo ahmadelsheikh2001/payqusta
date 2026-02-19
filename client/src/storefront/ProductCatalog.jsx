@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Search, Filter, ShoppingBag, X } from 'lucide-react';
-import axios from 'axios';
+import { api } from '../store';
+import { portalApi } from '../store/portalStore'; // Import portalApi
 import { Card, Input, Select, Badge, LoadingSpinner, EmptyState } from '../components/UI';
 
 export default function ProductCatalog() {
   const location = useLocation();
+  const isPortal = location.pathname.includes('/portal');
+  
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -14,18 +17,37 @@ export default function ProductCatalog() {
   const [priceRange, setPriceRange] = useState('all');
 
   useEffect(() => {
+    // Check if category query param exists
+    const params = new URLSearchParams(location.search);
+    const catParam = params.get('category');
+    if (catParam) setSelectedCategory(catParam);
+    
+    console.log('[ProductCatalog] Path:', location.pathname);
+    console.log('[ProductCatalog] isPortal:', isPortal);
+    
     loadData();
-  }, []);
+  }, [location.search, location.pathname]);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [productsRes, categoriesRes] = await Promise.all([
-        axios.get('/api/v1/products?isActive=true&limit=100'),
-        axios.get('/api/v1/products/categories')
-      ]);
-      setProducts(productsRes.data.data);
-      setCategories(categoriesRes.data.data);
+      if (isPortal) {
+        // Portal API returns standard structure with categories included
+        // We fetch with large limit to support client-side filtering preference for now, 
+        // OR we could rely on server filtering. Let's fetch all active for client filtering consistency.
+        const res = await portalApi.get('/portal/products?limit=100');
+        setProducts(res.data.data.products || []);
+        // Portal API returns categories list in the same response
+        setCategories(res.data.data.categories?.map(c => typeof c === 'string' ? c : c.name) || []);
+      } else {
+        // Storefront/Admin API
+        const [productsRes, categoriesRes] = await Promise.all([
+          api.get('/products?isActive=true&limit=100'),
+          api.get('/products/categories')
+        ]);
+        setProducts(productsRes.data.data || []);
+        setCategories(categoriesRes.data.data || []);
+      }
     } catch (err) {
       console.error('Failed to load products:', err);
     } finally {

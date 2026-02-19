@@ -287,12 +287,12 @@ class ProductController {
     const WhatsAppService = require('../services/WhatsAppService');
     const Tenant = require('../models/Tenant');
     const tenant = await Tenant.findById(req.tenantId);
-    
+
     const results = [];
 
     for (const supplierId in bySupplier) {
       const { supplier, products } = bySupplier[supplierId];
-      
+
       let message = `📦 *طلب إعادة تخزين*\n`;
       message += `━━━━━━━━━━━━━━━\n`;
       message += `من: ${tenant?.name || 'PayQusta'}\n`;
@@ -421,18 +421,17 @@ class ProductController {
     // 1. Try to get configured categories from tenant settings
     const Tenant = require('../models/Tenant');
     const tenant = await Tenant.findById(req.tenantId);
-    
-    let categories = tenant?.settings?.categories || [];
-    console.log(`[PROD_GET_CATS] Tenant ${req.tenantId} settings cats:`, categories);
+
+    let settingsCats = tenant?.settings?.categories || [];
+    // Extract names from objects, handle legacy strings
+    let categoryNames = settingsCats.map(c => typeof c === 'string' ? c : c.name);
 
     // 2. If empty or we want to include existing used categories, we can aggregate
     // For now, let's mix both: configured + actually used
     const usedCategories = await Product.distinct('category', { ...req.tenantFilter, isActive: true });
-    console.log(`[PROD_GET_CATS] Tenant ${req.tenantId} used cats:`, usedCategories);
-    
+
     // Merge and de-duplicate
-    const allCategories = [...new Set([...categories, ...usedCategories])].sort();
-    console.log(`[PROD_GET_CATS] Tenant ${req.tenantId} FINAL MERGED:`, allCategories);
+    const allCategories = [...new Set([...categoryNames, ...usedCategories])].sort();
 
     // Prevent caching
     res.set('Cache-Control', 'no-store');
