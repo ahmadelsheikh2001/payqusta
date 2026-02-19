@@ -44,8 +44,18 @@ const userSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Tenant',
       required: function () {
-        return this.role !== ROLES.ADMIN;
+        return this.role !== ROLES.ADMIN && !this.isSuperAdmin;
       },
+    },
+    branch: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Branch',
+      // Optional - for branch-level users
+    },
+    isSuperAdmin: {
+      type: Boolean,
+      default: false,
+      // Super Admin = System Owner (can see all tenants)
     },
     customRole: {
       type: mongoose.Schema.Types.ObjectId,
@@ -64,6 +74,20 @@ const userSchema = new mongoose.Schema(
     passwordChangedAt: { type: Date },
     passwordResetToken: { type: String },
     passwordResetExpires: { type: Date },
+    
+    // Gamification & Performance
+    gamification: {
+      points: { type: Number, default: 0 },
+      level: { type: Number, default: 1 },
+      dailyTarget: { type: Number, default: 1000 },
+      badges: [{
+        id: String,
+        awardedAt: { type: Date, default: Date.now }
+      }],
+      streak: { type: Number, default: 0 },
+      streak: { type: Number, default: 0 },
+      lastSaleDate: { type: Date }
+    },
   },
   {
     timestamps: true,

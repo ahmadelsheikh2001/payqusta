@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Search, Filter, ShoppingBag, X } from 'lucide-react';
 import axios from 'axios';
 import { Card, Input, Select, Badge, LoadingSpinner, EmptyState } from '../components/UI';
 
 export default function ProductCatalog() {
+  const location = useLocation();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -144,7 +145,7 @@ export default function ProductCatalog() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {filteredProducts.map(product => (
-            <Link key={product._id} to={`/store/products/${product._id}`}>
+            <Link key={product._id} to={`${location.pathname.includes('/portal') ? '/portal' : '/store'}/products/${product._id}`}>
               <Card className="group hover:shadow-xl transition-shadow overflow-hidden h-full">
                 {/* Product Image */}
                 <div className="aspect-square bg-gray-100 dark:bg-gray-800 relative overflow-hidden">

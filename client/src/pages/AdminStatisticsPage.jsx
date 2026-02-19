@@ -7,9 +7,18 @@ import toast from 'react-hot-toast';
 import { adminApi } from '../store';
 import { Card, LoadingSpinner, Badge } from '../components/UI';
 
+import { useAuthStore } from '../store';
+import BusinessReportsPage from './BusinessReportsPage';
+
 export default function AdminStatisticsPage() {
+  const { user } = useAuthStore();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // If user is Tenant Admin (not Super Admin), show them the Business Reports (Advanced Statistics for their business)
+  if (user?.role === 'admin' && !user?.isSuperAdmin) {
+    return <BusinessReportsPage />;
+  }
 
   useEffect(() => {
     loadStatistics();

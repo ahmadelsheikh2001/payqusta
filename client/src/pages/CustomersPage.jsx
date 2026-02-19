@@ -19,6 +19,8 @@ export default function CustomersPage() {
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ totalPages: 1, totalItems: 0 });
   const [tierFilter, setTierFilter] = useState('');
+  const [branchFilter, setBranchFilter] = useState('');
+  const [branches, setBranches] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -37,23 +39,40 @@ export default function CustomersPage() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
+  // Date Range State
+  const [dateFilter, setDateFilter] = useState({ startDate: '', endDate: '' });
+  const [showDateModal, setShowDateModal] = useState(false);
+  const [actionType, setActionType] = useState(null); // 'print' or 'whatsapp'
+
   const printRef = useRef(null);
   const LIMIT = 15;
+
+  useEffect(() => {
+    // Load branches
+    customersApi.getAll({}).then(() => {}); // Just to wake up
+    // We need a way to get branches. Typically useAuthStore or a dedicated API.
+    // Assuming we can get it from an API or just mocking for now since we added it to model.
+    // Let's use the one from store if available or just fetch manually.
+    import('../store').then(({ useAuthStore }) => {
+        useAuthStore.getState().getBranches().then(setBranches);
+    });
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const params = { page, limit: LIMIT, search };
       if (tierFilter) params.tier = tierFilter;
+      if (branchFilter) params.branch = branchFilter;
       const res = await customersApi.getAll(params);
       setCustomers(res.data.data || []);
       setPagination({ totalPages: res.data.pagination?.totalPages || 1, totalItems: res.data.pagination?.totalItems || 0 });
     } catch { toast.error('خطأ في تحميل العملاء'); }
     finally { setLoading(false); }
-  }, [page, search, tierFilter]);
+  }, [page, search, tierFilter, branchFilter]);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { setPage(1); }, [search, tierFilter]);
+  useEffect(() => { setPage(1); }, [search, tierFilter, branchFilter]);
 
   const openAdd = () => { setEditId(null); setForm({ name: '', phone: '', email: '', address: '', notes: '', creditLimit: 10000 }); setShowModal(true); };
   const openEdit = (c, e) => {
@@ -126,11 +145,26 @@ export default function CustomersPage() {
     }
   };
 
-  // Print statement
-  const handlePrint = () => {
+  // Open Date Modal before action
+  const preAction = (type) => {
+    setActionType(type);
+    setShowDateModal(true);
+  };
+
+  // Execute Action after Date Selection
+  const executeAction = () => {
+    setShowDateModal(false);
+    if (actionType === 'print') confirmPrint();
+    if (actionType === 'whatsapp') confirmWhatsApp();
+  };
+
+  // Print statement with Date Filter (Client-Side HTML)
+  const confirmPrint = () => {
+    // We use the existing printRef content which matches the user's preferred design.
     const printContent = printRef.current;
     if (!printContent) return;
     
+    // Create a hidden iframe or window for printing
     const printWindow = window.open('', '_blank');
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -155,10 +189,42 @@ export default function CustomersPage() {
           .total-row { background: #eee !important; font-weight: bold; }
           .items-table { margin: 10px 0; background: #fafafa; }
           .items-table th { background: #666; }
+          .summary-box { 
+             margin-top: 30px; 
+             padding: 15px; 
+             background: #f1f5f9; 
+             border: 1px solid #ddd; 
+             display: flex; 
+             justify-content: space-around; 
+             text-align: center;
+          }
+          .summary-item h3 { margin-bottom: 5px; font-size: 14px; color: #666; }
+          .summary-item p { font-size: 18px; font-weight: bold; }
           @media print { body { print-color-adjust: exact; } }
         </style>
       </head>
-      <body>${printContent.innerHTML}</body>
+      <body>
+        ${printContent.innerHTML}
+        
+        <div class="summary-box">
+          <div class="summary-item">
+             <h3>إجمالي المشتريات</h3>
+             <p>${fmt(selectedCustomer.financials?.totalPurchases)} ج.م</p>
+          </div>
+          <div class="summary-item">
+             <h3>إجمالي المدفوع</h3>
+             <p style="color: green">${fmt(selectedCustomer.financials?.totalPaid)} ج.م</p>
+          </div>
+          <div class="summary-item">
+             <h3>صافي المستحق</h3>
+             <p style="color: ${(selectedCustomer.financials?.outstandingBalance||0)>0?'red':'green'}">${fmt(selectedCustomer.financials?.outstandingBalance)} ج.م</p>
+          </div>
+        </div>
+        
+        <div style="margin-top: 30px; text-align: center; font-size: 10px; color: #999;">
+          تم إنشاء هذا الكشف بواسطة PayQusta — ${new Date().toLocaleString('ar-EG')}
+        </div>
+      </body>
       </html>
     `);
     printWindow.document.close();
@@ -166,21 +232,21 @@ export default function CustomersPage() {
   };
 
   // Send statement via WhatsApp API (as PDF)
-  const handleSendWhatsApp = async () => {
+  const confirmWhatsApp = async () => {
     if (!selectedCustomer?.phone) return toast.error('رقم الهاتف غير متوفر');
     setSendingWhatsApp(true);
     
     try {
-      const response = await customersApi.sendStatementPDF(selectedCustomer._id);
+      const response = await customersApi.sendStatementPDF(selectedCustomer._id, dateFilter);
       if (response.data.data?.whatsappSent) {
-        toast.success('تم إرسال كشف الحساب PDF عبر WhatsApp ✅');
+        toast.success(response.data.message || 'تم إرسال PDF بنجاح ✅');
+      } else if (response.data.data?.needsTemplate) {
+        toast.error(response.data.message);
       } else {
-        toast.success('تم إرسال ملخص الكشف عبر WhatsApp');
+        toast.success(response.data.message);
       }
     } catch (err) {
-      const message = `كشف حساب: ${selectedCustomer.name}\nالمستحق: ${(selectedCustomer.financials?.outstandingBalance || 0).toLocaleString('ar-EG')} ج.م`;
-      const phone = selectedCustomer.phone.replace(/[^0-9]/g, '');
-      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
+      toast.error(err.response?.data?.message || 'خطأ في الإرسال');
     } finally {
       setSendingWhatsApp(false);
     }
@@ -253,6 +319,8 @@ export default function CustomersPage() {
 
   return (
     <div className="space-y-5 animate-fade-in">
+
+
       {/* Header */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
@@ -260,6 +328,14 @@ export default function CustomersPage() {
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث بالاسم أو الهاتف..."
             className="w-full pr-10 pl-4 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:border-primary-500 transition-all" />
         </div>
+        
+        {/* Branch Filter */}
+        <select value={branchFilter} onChange={(e) => setBranchFilter(e.target.value)}
+          className="px-3 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm cursor-pointer">
+          <option value="">🏢 كل الفروع</option>
+          {branches.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
+        </select>
+
         <select value={tierFilter} onChange={(e) => setTierFilter(e.target.value)}
           className="px-3 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm cursor-pointer">
           <option value="">كل العملاء</option>
@@ -303,7 +379,7 @@ export default function CustomersPage() {
                         {selectedIds.length === customers.length && customers.length > 0 ? <CheckSquare className="w-4 h-4 text-primary-500" /> : <Square className="w-4 h-4 text-gray-400" />}
                       </button>
                     </th>
-                    {['العميل', 'الهاتف', 'المشتريات', 'المستحق', 'النقاط', 'الحالة', 'الإجراءات'].map((h) => (
+                    {['العميل', 'الهاتف', 'الفرع', 'المشتريات', 'المستحق', 'النقاط', 'الحالة', 'الإجراءات'].map((h) => (
                       <th key={h} className="px-4 py-3 text-right text-xs font-bold text-gray-400 uppercase">{h}</th>
                     ))}
                   </tr>
@@ -334,6 +410,7 @@ export default function CustomersPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-gray-600 dark:text-gray-300 font-mono text-xs" dir="ltr">{c.phone}</td>
+                      <td className="px-4 py-3 text-xs text-gray-500">{c.branch?.name || '—'}</td>
                       <td className="px-4 py-3 font-bold">{fmt(c.financials?.totalPurchases)} ج.م</td>
                       <td className="px-4 py-3">
                         <span className={`font-bold ${(c.financials?.outstandingBalance || 0) > 0 ? 'text-red-500' : 'text-emerald-500'}`}>
@@ -405,8 +482,8 @@ export default function CustomersPage() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={handlePrint}><Printer className="w-4 h-4 ml-1" />طباعة</Button>
-                <Button variant="whatsapp" size="sm" onClick={handleSendWhatsApp} loading={sendingWhatsApp}><Send className="w-4 h-4 ml-1" />إرسال WhatsApp</Button>
+                <Button variant="outline" size="sm" onClick={() => preAction('print')}><Printer className="w-4 h-4 ml-1" />طباعة</Button>
+                <Button variant="whatsapp" size="sm" onClick={() => preAction('whatsapp')} loading={sendingWhatsApp}><Send className="w-4 h-4 ml-1" />إرسال WhatsApp</Button>
                 <button onClick={() => setShowDetails(false)} className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 text-gray-400 hover:text-red-500 transition-colors">
                   <X className="w-5 h-5" />
                 </button>
@@ -739,6 +816,32 @@ export default function CustomersPage() {
           </div>
         </div>
       )}
+      {/* Date Range Modal - Moved to end for Z-Index */}
+      <Modal open={showDateModal} onClose={() => setShowDateModal(false)} title="تحديد الفترة (اختياري)">
+        <div className="space-y-4">
+           <div className="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-lg text-sm">
+             <p>اترك التواريخ فارغة لطباعة <b>كل المعاملات</b>.</p>
+           </div>
+           <div className="grid grid-cols-2 gap-4">
+             <Input 
+               label="من تاريخ" 
+               type="date" 
+               value={dateFilter.startDate} 
+               onChange={(e) => setDateFilter({ ...dateFilter, startDate: e.target.value })} 
+             />
+             <Input 
+               label="إلى تاريخ" 
+               type="date" 
+               value={dateFilter.endDate} 
+               onChange={(e) => setDateFilter({ ...dateFilter, endDate: e.target.value })} 
+             />
+           </div>
+        </div>
+        <div className="flex justify-end gap-3 mt-6">
+          <Button variant="ghost" onClick={() => setShowDateModal(false)}>إلغاء</Button>
+          <Button onClick={executeAction}>تأكيد {actionType === 'print' ? 'الطباعة' : 'الإرسال'}</Button>
+        </div>
+      </Modal>
     </div>
   );
 }

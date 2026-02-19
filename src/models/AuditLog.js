@@ -13,6 +13,11 @@ const auditLogSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    branch: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Branch',
+      index: true,
+    },
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

@@ -29,7 +29,7 @@ export default function ProductsPage() {
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [form, setForm] = useState({
     name: '', sku: '', barcode: '', category: 'هواتف', price: '', cost: '',
-    stockQuantity: '', minQuantity: '5', description: '', supplier: '',
+    stockQuantity: '', minQuantity: '5', description: '', supplier: '', expiryDate: '',
   });
   const LIMIT = 12;
 
@@ -56,8 +56,8 @@ export default function ProductsPage() {
   useEffect(() => { loadProducts(); }, [loadProducts]);
   useEffect(() => { setPage(1); }, [search, stockFilter, categoryFilter, supplierFilter]);
 
-  const openAdd = () => { setEditId(null); setProductImages([]); setForm({ name: '', sku: '', barcode: '', category: categories[0] || 'هواتف', price: '', cost: '', stockQuantity: '', minQuantity: '5', description: '', supplier: '' }); setShowModal(true); };
-  const openEdit = (p) => { setEditId(p._id); setProductImages(p.images || []); setForm({ name: p.name, sku: p.sku || '', barcode: p.barcode || '', category: p.category, price: String(p.price), cost: String(p.cost), stockQuantity: String(p.stock?.quantity || 0), minQuantity: String(p.stock?.minQuantity || 5), description: p.description || '', supplier: p.supplier?._id || p.supplier || '' }); setShowModal(true); };
+  const openAdd = () => { setEditId(null); setProductImages([]); setForm({ name: '', sku: '', barcode: '', category: categories[0] || 'هواتف', price: '', cost: '', stockQuantity: '', minQuantity: '5', description: '', supplier: '', expiryDate: '' }); setShowModal(true); };
+  const openEdit = (p) => { setEditId(p._id); setProductImages(p.images || []); setForm({ name: p.name, sku: p.sku || '', barcode: p.barcode || '', category: p.category, price: String(p.price), cost: String(p.cost), stockQuantity: String(p.stock?.quantity || 0), minQuantity: String(p.stock?.minQuantity || 5), description: p.description || '', supplier: p.supplier?._id || p.supplier || '', expiryDate: p.expiryDate ? p.expiryDate.split('T')[0] : '' }); setShowModal(true); };
 
   const handleSave = async () => {
     if (!form.name || !form.price) return toast.error('الاسم والسعر مطلوبين');
@@ -358,7 +358,24 @@ export default function ProductsPage() {
                     </div>
                   )}
 
-                  <div className="grid grid-cols-2 gap-2 mb-3">
+          {/* Branch Inventory Breakdown */}
+          {p.inventory && p.inventory.length > 0 && (
+            <div className="mb-3 p-2 bg-gray-50 dark:bg-gray-800/50 rounded-lg text-xs">
+              <p className="font-bold text-gray-500 mb-1">توزيع المخزون:</p>
+              <div className="space-y-1">
+                {p.inventory.map((inv, idx) => (
+                  <div key={idx} className="flex justify-between items-center">
+                    <span>{inv.branch?.name || 'فرع غير معروف'}</span>
+                    <span className={`font-bold ${inv.quantity <= inv.minQuantity ? 'text-red-500' : 'text-gray-700 dark:text-gray-300'}`}>
+                      {inv.quantity}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-2 mb-3">
                     <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2.5">
                       <p className="text-[10px] text-gray-400">سعر البيع</p>
                       <p className="text-sm font-extrabold text-primary-500">{(p.price || 0).toLocaleString('ar-EG')}</p>
@@ -408,7 +425,7 @@ export default function ProductsPage() {
           <Input label="اسم المنتج *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="sm:col-span-2" />
           <Input label="كود SKU" value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
 
-          {/* Barcode input with scanner */}
+          {/* Barcode input with scanner and search */}
           <div className="relative">
             <Input
               label="الباركود"
@@ -416,14 +433,49 @@ export default function ProductsPage() {
               onChange={(e) => setForm({ ...form, barcode: e.target.value })}
               placeholder="أدخل الباركود أو امسحه"
             />
-            <button
-              type="button"
-              onClick={() => setShowBarcodeScanner(true)}
-              className="absolute left-2 top-[34px] p-2 rounded-lg bg-primary-50 dark:bg-primary-500/10 text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-500/20 transition-colors"
-              title="مسح باركود"
-            >
-              <Scan className="w-4 h-4" />
-            </button>
+            <div className="absolute left-2 top-[34px] flex gap-1">
+               <button
+                type="button"
+                onClick={async () => {
+                    if(!form.barcode) return toast.error('أدخل الباركود أولاً');
+                    const loadToast = toast.loading('جاري البحث...');
+                    try {
+                        const { barcodeService } = await import('../services/BarcodeService');
+                        const productData = await barcodeService.getProductByBarcode(form.barcode);
+                        if (productData) {
+                            toast.success('تم العثور على المنتج!', { id: loadToast });
+                            setForm(prev => ({
+                                ...prev,
+                                name: productData.name || prev.name,
+                                description: productData.brand ? `ماركة: ${productData.brand}` : prev.description,
+                            }));
+                             if (productData.image) {
+                                toast((t) => (
+                                    <div className="flex items-center gap-2">
+                                        <img src={productData.image} className="w-10 h-10 rounded" alt="Found" />
+                                        <div className="text-sm"><p className="font-bold">وجدنا صورة!</p><a href={productData.image} target="_blank" className="text-blue-500 underline text-xs">عرض</a></div>
+                                    </div>
+                                ), { duration: 5000 });
+                            }
+                        } else {
+                            toast.error('لم يتم العثور على المنتج', { id: loadToast });
+                        }
+                    } catch { toast.error('خطأ في البحث', { id: loadToast }); }
+                }}
+                className="p-2 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors"
+                title="بحث عن بيانات المنتج"
+              >
+                <Search className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowBarcodeScanner(true)}
+                className="p-2 rounded-lg bg-primary-50 dark:bg-primary-500/10 text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-500/20 transition-colors"
+                title="مسح بالكاميرا"
+              >
+                <Scan className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
           <Select label="الفئة" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}
@@ -437,6 +489,7 @@ export default function ProductsPage() {
           <Input label="سعر التكلفة *" type="number" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} />
           <Input label="الكمية بالمخزون" type="number" value={form.stockQuantity} onChange={(e) => setForm({ ...form, stockQuantity: e.target.value })} />
           <Input label="الحد الأدنى (تنبيه)" type="number" value={form.minQuantity} onChange={(e) => setForm({ ...form, minQuantity: e.target.value })} />
+          <Input label="تاريخ الانتهاء" type="date" value={form.expiryDate} onChange={(e) => setForm({ ...form, expiryDate: e.target.value })} />
         </div>
 
         {/* Product Images */}
@@ -525,10 +578,49 @@ export default function ProductsPage() {
       {/* Barcode Scanner Modal */}
       {showBarcodeScanner && (
         <BarcodeScanner
-          onScan={(barcode) => {
-            setForm({ ...form, barcode });
+          onScan={async (barcode) => {
             setShowBarcodeScanner(false);
-            toast.success(`تم مسح الباركود: ${barcode}`);
+            const loadToast = toast.loading('جاري البحث عن بيانات المنتج...');
+            
+            try {
+              // Dynamically import service on demand
+              const { barcodeService } = await import('../services/BarcodeService');
+              const productData = await barcodeService.getProductByBarcode(barcode);
+              
+              if (productData) {
+                toast.success('تم العثور على بيانات المنتج! 🥫✨', { id: loadToast });
+                setForm(prev => ({
+                  ...prev,
+                  barcode,
+                  name: productData.name || prev.name,
+                  description: productData.brand ? `ماركة: ${productData.brand}` : prev.description,
+                  // We can't set image directly as file, but we could handle URL if backend supported it. 
+                  // For now, we just auto-fill text fields.
+                }));
+                
+                // If image URL found, user might want to download/upload it. 
+                // Enhanced feature: Show the image to user to confirm?
+                if (productData.image) {
+                    toast((t) => (
+                        <div className="flex items-center gap-2">
+                            <img src={productData.image} className="w-10 h-10 rounded" alt="Found" />
+                            <div className="text-sm">
+                                <p className="font-bold">وجدنا صورة للمنتج!</p>
+                                <a href={productData.image} target="_blank" className="text-blue-500 underline text-xs">عرض الصورة</a>
+                            </div>
+                        </div>
+                    ), { duration: 5000 });
+                }
+
+              } else {
+                toast.error('لم يتم العثور على بيانات للمنتج، لكن تم تسجيل الباركود.', { id: loadToast });
+                setForm(prev => ({ ...prev, barcode }));
+              }
+            } catch (err) {
+              console.error(err);
+              toast.error('خطأ في البحث، تم تسجيل الباركود فقط', { id: loadToast });
+              setForm(prev => ({ ...prev, barcode }));
+            }
           }}
           onClose={() => setShowBarcodeScanner(false)}
         />

@@ -63,6 +63,12 @@ const invoiceSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    branch: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Branch',
+      required: true,
+      index: true,
+    },
     invoiceNumber: {
       type: String,
       required: true,
@@ -132,6 +138,7 @@ const invoiceSchema = new mongoose.Schema(
 
 // Indexes
 invoiceSchema.index({ tenant: 1, invoiceNumber: 1 });
+invoiceSchema.index({ tenant: 1, branch: 1 });
 invoiceSchema.index({ tenant: 1, customer: 1 });
 invoiceSchema.index({ tenant: 1, status: 1 });
 invoiceSchema.index({ tenant: 1, createdAt: -1 });
@@ -233,45 +240,54 @@ invoiceSchema.methods.payAllRemaining = function (userId = null) {
 };
 
 // Static: Get overdue invoices for a tenant
-invoiceSchema.statics.getOverdueInvoices = function (tenantId) {
-  return this.find({
+invoiceSchema.statics.getOverdueInvoices = function (tenantId, branchId = null) {
+  const filter = {
     tenant: tenantId,
     status: { $in: [INVOICE_STATUS.OVERDUE, INVOICE_STATUS.PARTIALLY_PAID] },
     remainingAmount: { $gt: 0 },
-  })
+  };
+  if (branchId) filter.branch = branchId;
+
+  return this.find(filter)
     .populate('customer', 'name phone')
     .sort({ 'installments.dueDate': 1 });
 };
 
 // Static: Get upcoming installments
-invoiceSchema.statics.getUpcomingInstallments = function (tenantId, daysBefore = 1) {
+invoiceSchema.statics.getUpcomingInstallments = function (tenantId, daysBefore = 1, branchId = null) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const targetDate = new Date(today);
   targetDate.setDate(targetDate.getDate() + daysBefore);
   targetDate.setHours(23, 59, 59, 999);
 
-  return this.find({
+  const filter = {
     tenant: tenantId,
     'installments.status': { $in: ['pending', 'overdue'] },
     'installments.dueDate': { $gte: today, $lte: targetDate },
-  })
+  };
+  if (branchId) filter.branch = branchId;
+
+  return this.find(filter)
     .populate('customer', 'name phone whatsapp')
     .select('invoiceNumber customer totalAmount paidAmount remainingAmount installments');
 };
 
 // Static: Sales summary for dashboard
-invoiceSchema.statics.getSalesSummary = async function (tenantId, period = 30) {
+invoiceSchema.statics.getSalesSummary = async function (tenantId, period = 30, branchId = null) {
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - period);
 
+  const matchStage = {
+    tenant: new mongoose.Types.ObjectId(tenantId),
+    createdAt: { $gte: startDate },
+    status: { $ne: INVOICE_STATUS.CANCELLED },
+  };
+  if (branchId) matchStage.branch = new mongoose.Types.ObjectId(branchId);
+
   const result = await this.aggregate([
     {
-      $match: {
-        tenant: new mongoose.Types.ObjectId(tenantId),
-        createdAt: { $gte: startDate },
-        status: { $ne: INVOICE_STATUS.CANCELLED },
-      },
+      $match: matchStage,
     },
     {
       $group: {

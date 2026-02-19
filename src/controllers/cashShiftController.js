@@ -10,6 +10,76 @@ const Helpers = require('../utils/helpers');
 
 class CashShiftController {
   
+  /**
+   * Helper: Calculate cash stats for a specific user/shift timeframe
+   */
+  async _calculateShiftStats(tenantId, userId, startTime, endTime = new Date()) {
+    // 1. Direct Cash Sales (Invoices created as 'CASH')
+    // These usually don't have a 'payment' record array item in this system design (based on create method)
+    const cashInvoices = await Invoice.aggregate([
+      {
+        $match: {
+          tenant: tenantId,
+          createdBy: userId,
+          paymentMethod: 'cash',
+          createdAt: { $gte: startTime, $lte: endTime }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: '$totalAmount' },
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    // 2. Cash Payments on Invoices (Installments, Deferred, Partial)
+    // These are stored in the 'payments' array
+    const cashPayments = await Invoice.aggregate([
+      {
+        $match: {
+          tenant: tenantId,
+          'payments.recordedBy': userId,
+          'payments.date': { $gte: startTime, $lte: endTime },
+          'payments.method': 'cash'
+        }
+      },
+      { $unwind: '$payments' },
+      {
+        $match: {
+          'payments.recordedBy': userId,
+          'payments.date': { $gte: startTime, $lte: endTime },
+          'payments.method': 'cash'
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: '$payments.amount' },
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const totalInvoices = cashInvoices[0]?.total || 0;
+    const countInvoices = cashInvoices[0]?.count || 0;
+    
+    const totalPayments = cashPayments[0]?.total || 0;
+    const countPayments = cashPayments[0]?.count || 0;
+
+    return {
+      totalCashSales: totalInvoices + totalPayments,
+      breakdown: {
+        directSales: totalInvoices,
+        directCount: countInvoices,
+        collections: totalPayments,
+        collectionsCount: countPayments,
+        totalTransactions: countInvoices + countPayments
+      }
+    };
+  }
+
   // Get current active shift for the logged-in user
   async getCurrent(req, res, next) {
     try {
@@ -23,31 +93,17 @@ class CashShiftController {
         return ApiResponse.success(res, null, 'لا توجد وردية مفتوحة');
       }
 
-      // Calculate current sales in real-time for display
-      const sales = await Invoice.aggregate([
-        {
-          $match: {
-            tenant: shift.tenant, // ensure tenant scope
-            createdBy: req.user._id,
-            paymentMethod: 'cash',
-            createdAt: { $gte: shift.startTime }
-          }
-        },
-        {
-          $group: {
-            _id: null,
-            total: { $sum: '$totalAmount' } // Or paidAmount if strictly cash paid? Invoice usually has paidAmount. Let's use totalAmount for simplicity if fully paid, or we should check paidAmount.
-            // Better to match status: 'paid' or sum only paid parts?
-            // Simplified: Sum 'totalAmount' for 'cash' invoices.
-          }
-        }
-      ]);
-      
-      const currentSales = sales[0]?.total || 0;
+      // Calculate current sales in real-time
+      const stats = await this._calculateShiftStats(
+        shift.tenant, 
+        req.user._id, 
+        shift.startTime
+      );
       
       const response = shift.toObject();
-      response.currentSales = currentSales;
-      response.expectedNow = shift.openingBalance + currentSales;
+      response.currentSales = stats.totalCashSales;
+      response.expectedNow = shift.openingBalance + stats.totalCashSales;
+      response.breakdown = stats.breakdown;
 
       ApiResponse.success(res, response);
     } catch (error) {
@@ -96,32 +152,21 @@ class CashShiftController {
 
       if (!shift) return next(AppError.badRequest('لا توجد وردية مفتوحة لإغلاقها'));
 
-      // Calculate Cash Sales during this shift
-      // We look for invoices created by this user, method=cash, since startTime
-      const salesAgg = await Invoice.aggregate([
-        {
-          $match: {
-            tenant: shift.tenant,
-            createdBy: req.user._id,
-            paymentMethod: 'cash',
-            createdAt: { $gte: shift.startTime }
-          }
-        },
-        {
-          $group: {
-            _id: null,
-            total: { $sum: '$totalAmount' } 
-          }
-        }
-      ]);
+      // Calculate final stats
+      const endTime = new Date();
+      const stats = await this._calculateShiftStats(
+        shift.tenant,
+        req.user._id,
+        shift.startTime,
+        endTime
+      );
 
-      const totalCashSales = salesAgg[0]?.total || 0;
-      const expectedCash = shift.openingBalance + totalCashSales;
+      const expectedCash = shift.openingBalance + stats.totalCashSales;
       const variance = (actualCash || 0) - expectedCash;
 
       shift.status = 'closed';
-      shift.endTime = new Date();
-      shift.totalCashSales = totalCashSales;
+      shift.endTime = endTime;
+      shift.totalCashSales = stats.totalCashSales;
       shift.expectedCash = expectedCash;
       shift.actualCash = actualCash || 0;
       shift.variance = variance;
@@ -144,7 +189,8 @@ class CashShiftController {
       // Optionally filter by user if not admin?
       // Admin sees all, user sees own?
       // For now let's show all for simplicity or add query param
-      if (req.user.role !== 'admin' && req.user.role !== 'vendor') {
+      // Admin sees all, others see only their own
+      if (req.user.role !== 'admin' && !req.user.isSuperAdmin) {
          filter.user = req.user._id;
       }
 

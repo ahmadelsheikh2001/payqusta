@@ -8,7 +8,8 @@ import { Link } from 'react-router-dom';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import toast from 'react-hot-toast';
 import { biApi, dashboardApi } from '../store';
-import { Card, Badge, LoadingSpinner } from '../components/UI';
+import { Card, Badge, LoadingSpinner, Button } from '../components/UI';
+import BranchSettlementModal from '../components/BranchSettlementModal';
 
 const RISK_COLORS = { low: '#10b981', medium: '#f59e0b', high: '#ef4444', blocked: '#991b1b' };
 
@@ -19,6 +20,8 @@ export default function CommandCenterPage() {
   const [achievements, setAchievements] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
+  const [showSettlement, setShowSettlement] = useState(false);
+  const [selectedBranch, setSelectedBranch] = useState(null); // For future if we want to settle specific branch from here
 
   useEffect(() => {
     loadAll();
@@ -56,6 +59,9 @@ export default function CommandCenterPage() {
           <h2 className="text-xl font-black">مركز القيادة</h2>
           <p className="text-xs text-gray-400">ماذا تفعل اليوم؟ — {new Date().toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
         </div>
+        <button onClick={() => setShowSettlement(true)} className="px-4 py-2.5 rounded-xl bg-primary-600 text-white font-bold text-sm shadow-lg shadow-primary-600/20 hover:bg-primary-700 transition-colors">
+          تصفية الوردية
+        </button>
         <button onClick={loadAll} className="p-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
           <RefreshCw className="w-4 h-4" />
         </button>
@@ -226,6 +232,33 @@ export default function CommandCenterPage() {
             )}
           </Card>
 
+          {/* Branch Performance */}
+          {commandData.branchPerformance && commandData.branchPerformance.length > 0 && (
+            <Card className="p-5 lg:col-span-2">
+              <h4 className="font-bold text-sm mb-4 flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-primary-500" /> أداء الفروع اليوم
+              </h4>
+              <div className="space-y-3">
+                {commandData.branchPerformance.map((branch, i) => (
+                  <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-primary-100 dark:bg-primary-500/20 text-primary-600 flex items-center justify-center font-bold">
+                        {i + 1}
+                      </div>
+                      <div>
+                        <p className="font-bold text-sm">{branch.branchName}</p>
+                        <p className="text-[10px] text-gray-400">{branch.count} عملية بيع</p>
+                      </div>
+                    </div>
+                    <div className="text-left">
+                      <p className="font-black text-primary-600">{fmt(branch.totalSales)} ج.م</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
           {/* Low Stock */}
           <Card className="p-5">
             <h4 className="font-bold text-sm mb-3 flex items-center gap-2">
@@ -237,13 +270,15 @@ export default function CommandCenterPage() {
               <div className="space-y-2">
                 {commandData.lowStockProducts.slice(0, 6).map((p, i) => (
                   <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-amber-50 dark:bg-amber-500/10">
-                    <span className={`w-2 h-2 rounded-full ${p.stockStatus === 'out_of_stock' ? 'bg-red-500' : 'bg-amber-500'}`} />
+                    <span className={`w-2 h-2 rounded-full ${p.status === 'out_of_stock' ? 'bg-red-500' : 'bg-amber-500'}`} />
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm truncate">{p.name}</p>
-                      <p className="text-[10px] text-gray-400">{p.sku} — المورد: {p.supplier?.name || '—'}</p>
+                      <p className="text-[10px] text-gray-400">
+                        {p.branchName ? <span className="font-bold text-primary-600">[{p.branchName}]</span> : ''} {p.sku}
+                      </p>
                     </div>
-                    <Badge variant={p.stockStatus === 'out_of_stock' ? 'danger' : 'warning'}>
-                      {p.stockStatus === 'out_of_stock' ? 'نفذ' : `${p.stock?.quantity || 0} قطعة`}
+                    <Badge variant={p.status === 'out_of_stock' ? 'danger' : 'warning'}>
+                      {p.status === 'out_of_stock' ? 'نفذ' : `${p.quantity || 0} قطعة`}
                     </Badge>
                   </div>
                 ))}
@@ -387,6 +422,7 @@ export default function CommandCenterPage() {
           )}
         </div>
       )}
+      <BranchSettlementModal open={showSettlement} onClose={() => setShowSettlement(false)} />
     </div>
   );
 }

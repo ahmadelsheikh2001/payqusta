@@ -20,7 +20,14 @@ export default function LoginPage() {
     try {
       await login(email, password);
       toast.success('تم تسجيل الدخول بنجاح! 🎉');
-      navigate('/');
+      
+      // Get role from store or response (login updates store)
+      const { user } = useAuthStore.getState();
+      if (user?.isSuperAdmin) {
+        navigate('/admin/dashboard');
+      } else {
+        navigate('/');
+      }
     } catch (err) {
       toast.error(err.message || 'خطأ في تسجيل الدخول');
     }

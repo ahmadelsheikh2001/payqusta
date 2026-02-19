@@ -7,7 +7,7 @@ import Header from './components/Header';
 import AnimatedNotification from './components/AnimatedNotification';
 import ErrorBoundary from './components/ErrorBoundary';
 import SplashScreen from './components/SplashScreen';
-import OfflineIndicator from './components/OfflineIndicator';
+import InstallPrompt from './components/InstallPrompt';
 import LoginPage from './pages/LoginPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
@@ -24,6 +24,7 @@ import CommandCenterPage from './pages/CommandCenterPage';
 import ExpensesPage from './pages/ExpensesPage';
 import LowStockPage from './pages/LowStockPage';
 import SettingsPage from './pages/SettingsPage';
+import CamerasPage from './pages/CamerasPage';
 import CashDrawerPage from './pages/CashDrawerPage';
 import RolesPage from './pages/RolesPage';
 import ActivityLogsPage from './pages/ActivityLogsPage';
@@ -36,6 +37,9 @@ import AdminAuditLogsPage from './pages/AdminAuditLogsPage';
 import AdminStatisticsPage from './pages/AdminStatisticsPage';
 import ImportDataPage from './pages/ImportDataPage';
 import BackupRestorePage from './pages/BackupRestorePage';
+import BranchManagement from './pages/BranchManagement';
+import SuperAdminDashboard from './pages/SuperAdminDashboard';
+import TenantManagementPage from './pages/TenantManagementPage';
 
 // Storefront Pages
 import StorefrontLayout from './storefront/StorefrontLayout';
@@ -45,6 +49,12 @@ import ProductDetails from './storefront/ProductDetails';
 import ShoppingCart from './storefront/ShoppingCart';
 import Checkout from './storefront/Checkout';
 import OrderConfirmation from './storefront/OrderConfirmation';
+
+// Customer Portal Pages
+import PortalLogin from './portal/PortalLogin';
+import PortalLayout from './portal/PortalLayout';
+import PortalHome from './portal/PortalHome';
+
 
 // Protected Route wrapper
 function ProtectedRoute({ children }) {
@@ -66,16 +76,24 @@ function AdminRoute({ children }) {
   return children;
 }
 
+import BranchDashboardPage from './pages/BranchDashboardPage';
+
+// ... (other imports)
+
 // Main Layout with Sidebar + Header
 function MainLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { dark } = useThemeStore();
   const location = useLocation();
+  const { user } = useAuthStore();
 
   // Close sidebar on route change (mobile)
   useEffect(() => {
     setSidebarOpen(false);
   }, [location.pathname]);
+  
+  // Dashboard Component (Original)
+  const DashboardComponent = DashboardPage;
 
   return (
     <div className={`flex h-screen overflow-hidden ${dark ? 'dark' : ''}`}>
@@ -86,6 +104,7 @@ function MainLayout() {
         {/* Main Content */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <Header onMenuClick={() => setSidebarOpen(true)} />
+          
           <main className="flex-1 overflow-y-auto p-4 md:p-6">
             <ErrorBoundary>
             <Routes>
@@ -121,6 +140,15 @@ function MainLayout() {
               <Route path="/business-reports" element={<BusinessReportsPage />} />
               <Route path="/aging-report" element={<AgingReportPage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/cameras" element={<CamerasPage />} />
+              <Route path="/branches" element={<BranchManagement />} />
+              {/* Super Admin Routes */}
+              {user?.isSuperAdmin && (
+                <>
+                  <Route path="/super-admin" element={<SuperAdminDashboard />} />
+                  <Route path="/tenant-management" element={<TenantManagementPage />} />
+                </>
+              )}
               <Route path="/cash-drawer" element={<CashDrawerPage />} />
               <Route path="/roles" element={<RolesPage />} />
               <Route path="/activity-logs" element={<ActivityLogsPage />} />
@@ -171,8 +199,8 @@ export default function App() {
           }}
         />
         
-        {/* Offline Indicator */}
-        <OfflineIndicator />
+        {/* PWA Install Prompt */}
+        <InstallPrompt />
         
         <Routes>
           <Route path="/login" element={
@@ -185,6 +213,26 @@ export default function App() {
               <MainLayout />
             </ProtectedRoute>
           } />
+
+          {/* Customer Portal Routes */}
+          <Route path="/portal/login" element={
+            /* If we had a portal specific auth check in store, we could redirect if logged in. 
+               For now, PortalLogin handles it or just renders login. 
+            */
+            <PortalLogin />
+          } />
+          
+          <Route path="/portal" element={
+            /* PortalLayout should check for customer token/auth */
+            <PortalLayout />
+          }>
+             <Route index element={<Navigate to="dashboard" replace />} />
+             <Route path="dashboard" element={<PortalHome />} />
+             <Route path="products" element={<ProductCatalog />} /> 
+             <Route path="products/:id" element={<ProductDetails />} />
+             <Route path="cart" element={<ShoppingCart />} />
+             <Route path="checkout" element={<Checkout />} />
+          </Route>
         </Routes>
       </BrowserRouter>
     </div>

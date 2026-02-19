@@ -1,22 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import {
   TrendingUp, FileText, Clock, Boxes, CreditCard, AlertTriangle,
-  Users, Truck, Calendar, DollarSign, Star, Zap, BarChart3,
+  Users, Truck, Calendar, DollarSign, Star, Zap, BarChart3, Store,
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Link } from 'react-router-dom';
-import { dashboardApi } from '../store';
+import { dashboardApi, useAuthStore } from '../store';
 import { StatCard, Card, Badge, LoadingSpinner } from '../components/UI';
+import AIStockWidget from '../components/AIStockWidget';
 
 export default function DashboardPage() {
+  const { user, getBranches } = useAuthStore();
   const [data, setData] = useState(null);
   const [collections, setCollections] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [branches, setBranches] = useState([]);
+  const [selectedBranch, setSelectedBranch] = useState('all');
 
   useEffect(() => {
+    // Fetch branches for filter
+    if (user?.role === 'admin' || user?.isSuperAdmin) {
+      getBranches().then(setBranches).catch(() => {});
+    }
+  }, [user]);
+
+  useEffect(() => {
+    setLoading(true);
+    const params = selectedBranch !== 'all' ? { branch: selectedBranch } : {};
+
     Promise.all([
-      dashboardApi.getOverview(),
-      dashboardApi.getDailyCollections(),
+      dashboardApi.getOverview(params),
+      dashboardApi.getDailyCollections(params),
     ]).then(([ovRes, colRes]) => {
       setData(ovRes.data.data);
       setCollections(colRes.data.data);
@@ -29,7 +43,7 @@ export default function DashboardPage() {
         monthlySales: [], topProducts: [], recentInvoices: [],
       });
     }).finally(() => setLoading(false));
-  }, []);
+  }, [selectedBranch]);
 
   if (loading) return <LoadingSpinner />;
   if (!data) return null;
@@ -38,14 +52,33 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Quick Actions */}
-      <div className="flex flex-wrap gap-2">
-        <Link to="/quick-sale" className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 text-white text-sm font-bold shadow-lg shadow-amber-500/25 hover:shadow-xl hover:-translate-y-0.5 transition-all">
-          <Zap className="w-4 h-4" /> بيع سريع
-        </Link>
-        <Link to="/reports" className="flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 text-sm font-bold hover:bg-gray-50 dark:hover:bg-gray-800 transition-all">
-          <BarChart3 className="w-4 h-4 text-violet-500" /> التقارير
-        </Link>
+      {/* Quick Actions & Filter */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex gap-2">
+          <Link to="/quick-sale" className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 text-white text-sm font-bold shadow-lg shadow-amber-500/25 hover:shadow-xl hover:-translate-y-0.5 transition-all">
+            <Zap className="w-4 h-4" /> بيع سريع
+          </Link>
+          <Link to="/reports" className="flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 text-sm font-bold hover:bg-gray-50 dark:hover:bg-gray-800 transition-all">
+            <BarChart3 className="w-4 h-4 text-violet-500" /> التقارير
+          </Link>
+        </div>
+
+        {/* Branch Filter */}
+        {(user?.role === 'admin' || user?.isSuperAdmin) && branches.length > 0 && (
+          <div className="flex items-center gap-2 bg-white dark:bg-gray-800 p-1.5 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+            <Store className="w-4 h-4 text-gray-400 mr-2" />
+            <select
+              value={selectedBranch}
+              onChange={(e) => setSelectedBranch(e.target.value)}
+              className="bg-transparent border-none text-sm font-bold focus:ring-0 cursor-pointer"
+            >
+              <option value="all">كل الفروع</option>
+              {branches.map(b => (
+                <option key={b._id} value={b._id}>{b.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Stats */}
@@ -69,6 +102,9 @@ export default function DashboardPage() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* AI Stock Advisor Widget */}
+        <AIStockWidget />
+
         {/* Sales Chart */}
         <Card className="p-5 lg:col-span-2">
           <h3 className="text-base font-bold mb-4">المبيعات الشهرية</h3>

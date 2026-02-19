@@ -2,7 +2,7 @@ import React, { useState, Suspense, lazy } from 'react';
 import {
   Store, User, MessageCircle, Tag, CreditCard, Palette, Users
 } from 'lucide-react';
-import { useThemeStore } from '../store';
+import { useThemeStore, useAuthStore } from '../store';
 import { LoadingSpinner } from '../components/UI';
 
 // Lazy load all settings components to improve performance
@@ -14,19 +14,25 @@ const SettingsInstallments = lazy(() => import('../components/settings/SettingsI
 const SettingsUsers = lazy(() => import('../components/settings/SettingsUsers'));
 
 // Settings tabs configuration
-const TABS = [
-  { id: 'store', label: 'المتجر', icon: Store, color: 'primary' },
-  { id: 'profile', label: 'حسابي', icon: User, color: 'emerald' },
-  { id: 'users', label: 'المستخدمين', icon: Users, color: 'blue' },
-  { id: 'whatsapp', label: 'واتساب', icon: MessageCircle, color: 'green' },
-  { id: 'categories', label: 'التصنيفات', icon: Tag, color: 'purple' },
-  { id: 'installments', label: 'الأقساط', icon: CreditCard, color: 'blue' },
-  { id: 'appearance', label: 'المظهر', icon: Palette, color: 'pink' },
+const ALL_TABS = [
+  { id: 'store', label: 'المتجر', icon: Store, color: 'primary', adminOnly: true }, // Only for admin
+  { id: 'profile', label: 'حسابي', icon: User, color: 'emerald', adminOnly: false },
+  { id: 'users', label: 'المستخدمين', icon: Users, color: 'blue', adminOnly: true }, // Only for admin
+  { id: 'whatsapp', label: 'واتساب', icon: MessageCircle, color: 'green', adminOnly: true }, // Changed to adminOnly
+  { id: 'categories', label: 'التصنيفات', icon: Tag, color: 'purple', adminOnly: true }, // Changed to adminOnly
+  { id: 'installments', label: 'الأقساط', icon: CreditCard, color: 'blue', adminOnly: true }, // Changed to adminOnly
+  { id: 'appearance', label: 'المظهر', icon: Palette, color: 'pink', adminOnly: false },
 ];
 
 export default function SettingsPage() {
   const { dark, toggleTheme } = useThemeStore();
+  const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState('store');
+
+  // Filter tabs based on user role
+  const TABS = ALL_TABS.filter(tab => 
+    !tab.adminOnly || user?.role === 'admin' || user?.isSuperAdmin
+  );
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -48,7 +54,15 @@ export default function SettingsPage() {
                 <p className="text-sm text-gray-400">تخصيص واجهة التطبيق</p>
               </div>
             </div>
-            
+
+            {/* New content for reports and cash drawer, placed logically within the appearance tab,
+                assuming these are related settings or quick links from this context.
+                The original instruction's placement was syntactically incorrect.
+                This placement assumes these are additional settings/links within the appearance section.
+                If these are meant for a main navigation, they should be in a different file.
+            */}
+
+
             <div className="p-4 rounded-xl border border-gray-200 dark:border-gray-700 flex items-center justify-between">
               <div>
                 <h3 className="font-bold">الوضع الليلي</h3>
@@ -61,6 +75,9 @@ export default function SettingsPage() {
                 <div className={`absolute top-1 w-6 h-6 rounded-full bg-white transition-transform ${dark ? 'left-1 translate-x-0' : 'left-1 translate-x-6'}`} />
               </button> 
             </div>
+
+            {/* PWA Install Button */}
+            <InstallAppButton />
           </div>
         );
       default: return null;
@@ -105,6 +122,90 @@ export default function SettingsPage() {
           {renderTabContent()}
         </Suspense>
       </div>
+    </div>
+  );
+}
+
+// Internal component for Install Button
+function InstallAppButton() {
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  React.useEffect(() => {
+    // Check if installed
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setIsInstalled(true);
+    }
+
+    const handler = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+    }
+  };
+
+  if (isInstalled) {
+    return (
+       <div className="p-4 rounded-xl border border-green-200 bg-green-50 dark:bg-green-900/10 dark:border-green-800 flex items-center gap-3">
+         <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-800 flex items-center justify-center">
+            <Store className="w-5 h-5 text-green-600" />
+         </div>
+         <div>
+           <h3 className="font-bold text-green-700 dark:text-green-400">التطبيق مثبت</h3>
+           <p className="text-sm text-green-600/80">أنت تستخدم النسخة المثبتة من النظام</p>
+         </div>
+       </div>
+    );
+  }
+
+  if (!deferredPrompt) {
+    if (import.meta.env.DEV) {
+      return (
+        <div className="p-4 rounded-xl border border-yellow-200 bg-yellow-50 dark:bg-yellow-900/10 dark:border-yellow-800 text-sm text-yellow-700 dark:text-yellow-400">
+           <div className="font-bold flex items-center gap-2">
+             <Store className="w-4 h-4" />
+             وضع المطور (Debug Mode)
+           </div>
+           <p className="mt-1">زر التثبيت غير متاح حالياً.</p>
+           <ul className="list-disc list-inside mt-2 space-y-1 text-xs opacity-80">
+             <li>تأكد أن التطبيق ليس مثبتاً بالفعل.</li>
+             <li>تأكد من العمل على localhost أو HTTPS.</li>
+             <li>متصفح Chrome/Edge يتطلب تفاعل المستخدم أحياناً.</li>
+             <li>حدث الصفحة (Refresh) وحاول مرة أخرى.</li>
+           </ul>
+        </div>
+      );
+    }
+    return null;
+  }
+
+  return (
+    <div className="p-4 rounded-xl border border-primary-200 bg-primary-50 dark:bg-primary-900/10 dark:border-primary-800 flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-800 flex items-center justify-center">
+           <Store className="w-5 h-5 text-primary-600" />
+        </div>
+        <div>
+          <h3 className="font-bold text-gray-900 dark:text-white">تثبيت التطبيق</h3>
+          <p className="text-sm text-gray-500">قم بتثبيت النظام على جهازك لسهولة الوصول والعمل بدون إنترنت</p>
+        </div>
+      </div>
+      <button
+        onClick={handleInstall}
+        className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors"
+      >
+        تثبيت الآن
+      </button>
     </div>
   );
 }

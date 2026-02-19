@@ -52,6 +52,10 @@ const tenantSchema = new mongoose.Schema(
       lowStockThreshold: { type: Number, default: 5 },
       autoRestockAlert: { type: Boolean, default: true },
       enableGamification: { type: Boolean, default: true },
+      categories: { 
+        type: [String], 
+        default: [] // Start with empty categories for true isolation
+      },
     },
     // WhatsApp configuration
     whatsapp: {
@@ -83,11 +87,10 @@ const tenantSchema = new mongoose.Schema(
         supplierPaymentDue: { type: Boolean, default: true },
       },
     },
-    // Subscription
     subscription: {
       plan: {
         type: String,
-        enum: ['free', 'basic', 'professional', 'enterprise'],
+        enum: ['free', 'basic', 'pro', 'professional', 'enterprise'],
         default: 'free',
       },
       status: {
@@ -108,6 +111,15 @@ const tenantSchema = new mongoose.Schema(
         position: { x: Number, y: Number, w: Number, h: Number },
         visible: { type: Boolean, default: true },
       },
+    ],
+    // CCTV Cameras
+    cameras: [
+      {
+        name: { type: String, required: true },
+        url: { type: String, required: true }, // HLS (.m3u8), MP4, or Embed URL
+        type: { type: String, enum: ['stream', 'embed'], default: 'stream' },
+        branch: { type: String }, // Optional: link to specific branch
+      }
     ],
     isActive: { type: Boolean, default: true },
   },

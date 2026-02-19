@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../store';
 import { toast } from 'react-hot-toast';
-import { DollarSign, Clock, Lock, CheckCircle, AlertTriangle, History } from 'lucide-react';
+import { DollarSign, Clock, Lock, CheckCircle, AlertTriangle, History, TrendingUp, Wallet } from 'lucide-react';
 import { Button, Card, Input, Modal, LoadingSpinner, EmptyState, Badge } from '../components/UI';
 import Pagination from '../components/Pagination';
+import { useAuthStore } from '../store';
 
 export default function CashDrawerPage() {
+  const { user } = useAuthStore();
   const [activeShift, setActiveShift] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -74,7 +76,9 @@ export default function CashDrawerPage() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-black bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">إدارة الخزينة والورديات</h1>
-          <p className="text-gray-500 mt-1">فتح وإغلاق الورديات ومتابعة النقدية</p>
+          <p className="text-gray-500 mt-1">
+            {user?.role === 'admin' || user?.isSuperAdmin ? 'متابعة نقدية الفروع والموظفين' : 'إدارة ورديتك ومبيعاتك اليومية'}
+          </p>
         </div>
       </div>
 
@@ -103,12 +107,25 @@ export default function CashDrawerPage() {
                   
                   <div className="space-y-4">
                     <div className="flex justify-between items-center p-3 bg-black/10 rounded-xl">
-                      <span className="text-sm font-medium opacity-80">الرصيد الافتتاحي</span>
+                      <div className="flex items-center gap-2">
+                        <Wallet className="w-4 h-4 opacity-80" />
+                        <span className="text-sm font-medium opacity-80">الرصيد الافتتاحي</span>
+                      </div>
                       <span className="font-bold text-lg">{fmt(activeShift.openingBalance)}</span>
                     </div>
                     <div className="flex justify-between items-center p-3 bg-black/10 rounded-xl">
-                      <span className="text-sm font-medium opacity-80">مبيعات نقدية (حتى الآن)</span>
-                      <span className="font-bold text-lg text-green-200">+{fmt(activeShift.currentSales)}</span>
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="w-4 h-4 opacity-80" />
+                        <span className="text-sm font-medium opacity-80">مبيعات نقدية (مسجلة)</span>
+                      </div>
+                      <div className="text-right">
+                         <span className="font-bold text-lg text-green-200">+{fmt(activeShift.currentSales)}</span>
+                         {activeShift.breakdown && (
+                           <p className="text-xs opacity-60">
+                             مباشر: {fmt(activeShift.breakdown.directSales)} | تحصيل: {fmt(activeShift.breakdown.collections)}
+                           </p>
+                         )}
+                      </div>
                     </div>
                     <div className="pt-2 border-t border-white/10 flex justify-between items-center">
                        <span className="text-lg font-bold">المتوقع في الدرج</span>
@@ -134,13 +151,17 @@ export default function CashDrawerPage() {
                    <h3 className="text-xl font-bold">زمن الوردية</h3>
                    <p className="text-gray-500">مفتوحة منذ {Math.floor((new Date() - new Date(activeShift.startTime)) / 1000 / 60)} دقيقة</p>
                 </div>
+                {/* Motivation for Staff */}
+                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl w-full">
+                  <p className="text-sm text-blue-800 dark:text-blue-200 font-bold">🎯 هدف اليوم: حقق مبيعات أعلى!</p>
+                </div>
               </Card>
             </div>
           )}
 
           {/* History Table */}
           <div className="mt-10">
-            <h3 className="text-xl font-bold mb-4 flex items-center gap-2"><History className="w-5 h-5" /> سجل الورديات السابق</h3>
+            <h3 className="text-xl font-bold mb-4 flex items-center gap-2"><History className="w-5 h-5" /> {user?.role === 'admin' ? 'سجل ورديات الموظفين' : 'سجل وردياتي السابق'}</h3>
             <Card className="overflow-hidden">
                <div className="overflow-x-auto">
                  <table className="w-full text-right text-sm">
@@ -163,14 +184,14 @@ export default function CashDrawerPage() {
                          <td className="p-4">{shift.user?.name}</td>
                          <td className="p-4">{new Date(shift.startTime).toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'})}</td>
                          <td className="p-4">{shift.endTime ? new Date(shift.endTime).toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'}) : '—'}</td>
-                         <td className="p-4 font-bold">{fmt(shift.totalCashSales)}</td>
+                         <td className="p-4 font-bold text-emerald-600">{fmt(shift.totalCashSales)}</td>
                          <td className="p-4">
                            {shift.variance === 0 ? (
-                             <Badge variant="success">مطابق</Badge>
+                             <Badge variant="success">مطابق ✅</Badge>
                            ) : shift.variance < 0 ? (
-                             <span className="text-red-500 font-bold dir-ltr">{fmt(shift.variance)}</span>
+                             <Badge variant="danger" className="dir-ltr">عجز {fmt(shift.variance)}</Badge>
                            ) : (
-                             <span className="text-green-500 font-bold">+{fmt(shift.variance)}</span>
+                             <Badge variant="warning" className="dir-ltr">زيادة +{fmt(shift.variance)}</Badge>
                            )}
                          </td>
                        </tr>
@@ -192,43 +213,52 @@ export default function CashDrawerPage() {
             type="number"
             value={openingBalance}
             onChange={(e) => setOpeningBalance(e.target.value)}
-            className="text-lg"
+            className="text-lg font-bold"
           />
-          <Button onClick={handleOpenShift} className="w-full">بدء الوردية</Button>
+          <Button onClick={handleOpenShift} className="w-full" size="lg">بدء الوردية</Button>
         </div>
       </Modal>
 
       {/* Close Modal */}
       <Modal open={showCloseModal} onClose={() => setShowCloseModal(false)} title="إغلاق الوردية">
         <div className="space-y-4">
-          <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl text-center">
-             <p className="text-gray-500 text-sm">المبلغ المتوقع في الدرج</p>
-             <p className="text-3xl font-black text-primary-600">{activeShift && fmt(activeShift.expectedNow)}</p>
+          <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl text-center border-2 border-dashed border-gray-200 dark:border-gray-700">
+             <p className="text-gray-500 text-sm mb-1">المبلغ المتوقع في الدرج</p>
+             <p className="text-4xl font-black text-gray-800 dark:text-gray-100">{activeShift && fmt(activeShift.expectedNow)}</p>
           </div>
+          
+          <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg text-sm text-yellow-800 dark:text-yellow-200">
+            ⚠️ قم بعد النقود الموجودة في الدرج فعلياً واكتب الرقم أدناه. سيقوم النظام بحساب العجز أو الزيادة تلقائياً.
+          </div>
+
           <Input 
             label="النقدية الفعلية (بعد العد)"
             type="number"
             value={closingForm.actualCash}
             onChange={(e) => setClosingForm({...closingForm, actualCash: e.target.value})}
-            className="text-lg"
+            className="text-2xl font-black text-center"
             autoFocus
-          />
-          <Input 
-            label="ملاحظات"
-            value={closingForm.notes}
-            onChange={(e) => setClosingForm({...closingForm, notes: e.target.value})}
           />
           
           {closingForm.actualCash > 0 && activeShift && (
-             <div className={`p-3 rounded-lg text-center font-bold ${
-                Number(closingForm.actualCash) - activeShift.expectedNow === 0 ? 'bg-green-50 text-green-600' : 
-                Number(closingForm.actualCash) - activeShift.expectedNow < 0 ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'
+             <div className={`p-4 rounded-xl text-center font-bold text-lg animate-pulse-once ${
+                Number(closingForm.actualCash) - activeShift.expectedNow === 0 ? 'bg-green-100 text-green-700' : 
+                Number(closingForm.actualCash) - activeShift.expectedNow < 0 ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
              }`}>
-                الفرق: {fmt(Number(closingForm.actualCash) - activeShift.expectedNow)}
+                {Number(closingForm.actualCash) - activeShift.expectedNow === 0 ? '✅ المبلغ مطابق تماماً' : 
+                 Number(closingForm.actualCash) - activeShift.expectedNow < 0 ? `❌ يوجد عجز: ${fmt(Number(closingForm.actualCash) - activeShift.expectedNow)}` : 
+                 `ℹ️ يوجد زيادة: +${fmt(Number(closingForm.actualCash) - activeShift.expectedNow)}`}
              </div>
           )}
 
-          <Button onClick={handleCloseShift} variant="danger" className="w-full">تأكيد الإغلاق</Button>
+          <Input 
+            label="ملاحظات (اختياري)"
+            value={closingForm.notes}
+            onChange={(e) => setClosingForm({...closingForm, notes: e.target.value})}
+            placeholder="مثال: تم صرف 50 ريال للصيانة..."
+          />
+
+          <Button onClick={handleCloseShift} variant="danger" className="w-full" size="lg">تأكيد الإغلاق وترحيل المبالغ</Button>
         </div>
       </Modal>
     </div>

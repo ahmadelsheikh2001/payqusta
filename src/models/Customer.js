@@ -14,6 +14,12 @@ const customerSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    branch: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Branch',
+      // Optional: if not set, customer is global or assigned to main branch
+      index: true,
+    },
     name: {
       type: String,
       required: [true, 'اسم العميل مطلوب'],
@@ -29,6 +35,19 @@ const customerSchema = new mongoose.Schema(
     address: { type: String, trim: true },
     // National ID or tax ID
     nationalId: { type: String, trim: true },
+    
+    // Portal Authentication
+    password: { 
+      type: String, 
+      select: false,
+      minlength: 6 
+    },
+    isPortalActive: { 
+      type: Boolean, 
+      default: true 
+    },
+    lastLogin: { type: Date },
+
     // Financial summary
     financials: {
       totalPurchases: { type: Number, default: 0 },
@@ -108,6 +127,22 @@ const customerSchema = new mongoose.Schema(
     toObject: { virtuals: true },
   }
 );
+
+// Encrypt password using bcrypt
+const bcrypt = require('bcryptjs');
+
+customerSchema.pre('save', async function (next) {
+  if (!this.isModified('password')) {
+    next();
+  }
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
+});
+
+// Match user entered password to hashed password in database
+customerSchema.methods.matchPassword = async function (enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.password);
+};
 
 // Indexes
 customerSchema.index({ tenant: 1, phone: 1 }, { unique: true });

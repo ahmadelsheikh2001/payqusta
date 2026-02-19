@@ -10,9 +10,19 @@ import { Card, LoadingSpinner, Badge } from '../components/UI';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
+import { useAuthStore } from '../store';
+import CommandCenterPage from './CommandCenterPage';
+
 export default function AdminDashboardPage() {
+  const { user } = useAuthStore();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // If user is Tenant Admin (not Super Admin), show them the Command Center (Business Dashboard)
+  // This satisfies the request to show "all branch details" to the Owner
+  if (user?.role === 'admin' && !user?.isSuperAdmin) {
+    return <CommandCenterPage />;
+  }
 
   useEffect(() => {
     loadDashboard();

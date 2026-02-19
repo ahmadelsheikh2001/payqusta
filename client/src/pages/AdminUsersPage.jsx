@@ -11,9 +11,14 @@ import Pagination from '../components/Pagination';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
+import { useAuthStore } from '../store';
+
 export default function AdminUsersPage() {
+  const { user } = useAuthStore();
+  const isSuperAdmin = user?.isSuperAdmin;
   const [users, setUsers] = useState([]);
   const [tenants, setTenants] = useState([]);
+  const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
@@ -64,10 +69,24 @@ export default function AdminUsersPage() {
     }
   };
 
+  const loadBranches = async () => {
+    if (isSuperAdmin) return;
+    try {
+      const res = await useAuthStore.getState().getBranches();
+      setBranches(res || []);
+    } catch (err) {
+      console.error('Error loading branches:', err);
+    }
+  };
+
   useEffect(() => {
     load();
-    loadTenants();
-  }, [load]);
+    if (isSuperAdmin) {
+      loadTenants();
+    } else {
+      loadBranches();
+    }
+  }, [load, isSuperAdmin]);
 
   useEffect(() => {
     setPage(1);
@@ -81,7 +100,8 @@ export default function AdminUsersPage() {
       phone: '',
       password: '',
       role: 'vendor',
-      tenantId: '',
+      tenantId: isSuperAdmin ? '' : user.tenant._id,
+      branch: '',
     });
     setShowModal(true);
   };
@@ -94,6 +114,7 @@ export default function AdminUsersPage() {
       phone: user.phone,
       role: user.role,
       isActive: user.isActive,
+      branch: user.branch?._id || '',
     });
     setShowModal(true);
   };
@@ -110,6 +131,7 @@ export default function AdminUsersPage() {
           phone: form.phone,
           role: form.role,
           isActive: form.isActive,
+          branch: form.branch || null,
           ...(form.password ? { password: form.password } : {}),
         });
         toast.success('تم تحديث المستخدم ✅');
@@ -122,12 +144,15 @@ export default function AdminUsersPage() {
       }
     } else {
       // Create new user
-      if (!form.name || !form.email || !form.phone || !form.tenantId) {
+      if (!form.name || !form.email || !form.phone || (isSuperAdmin && !form.tenantId)) {
         return toast.error('جميع الحقول مطلوبة');
       }
       setSaving(true);
       try {
-        await adminApi.createUser(form);
+        await adminApi.createUser({
+          ...form,
+          tenantId: isSuperAdmin ? form.tenantId : user.tenant._id, // Ensure tenantId is sent
+        });
         toast.success('تم إنشاء المستخدم بنجاح ✅');
         setShowModal(false);
         load();
@@ -203,18 +228,20 @@ export default function AdminUsersPage() {
               <option value="vendor">Vendor</option>
               <option value="coordinator">Coordinator</option>
             </select>
-            <select
-              value={tenantFilter}
-              onChange={(e) => setTenantFilter(e.target.value)}
-              className="px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="">كل المتاجر</option>
-              {tenants.map((tenant) => (
-                <option key={tenant._id} value={tenant._id}>
-                  {tenant.name}
-                </option>
-              ))}
-            </select>
+            {isSuperAdmin && (
+              <select
+                value={tenantFilter}
+                onChange={(e) => setTenantFilter(e.target.value)}
+                className="px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="">كل المتاجر</option>
+                {tenants.map((tenant) => (
+                  <option key={tenant._id} value={tenant._id}>
+                    {tenant.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
         </div>
       </Card>
@@ -238,7 +265,9 @@ export default function AdminUsersPage() {
               <thead>
                 <tr className="border-b border-gray-100 dark:border-gray-800">
                   <th className="text-right p-4 text-sm font-bold text-gray-500 dark:text-gray-400">المستخدم</th>
-                  <th className="text-right p-4 text-sm font-bold text-gray-500 dark:text-gray-400">المتجر</th>
+                  <th className="text-right p-4 text-sm font-bold text-gray-500 dark:text-gray-400">
+                    {isSuperAdmin ? 'المتجر' : 'الفرع'}
+                  </th>
                   <th className="text-right p-4 text-sm font-bold text-gray-500 dark:text-gray-400">الدور</th>
                   <th className="text-right p-4 text-sm font-bold text-gray-500 dark:text-gray-400">الحالة</th>
                   <th className="text-right p-4 text-sm font-bold text-gray-500 dark:text-gray-400">تاريخ الإنشاء</th>
@@ -272,13 +301,21 @@ export default function AdminUsersPage() {
                       </div>
                     </td>
                     <td className="p-4">
-                      {user.tenant ? (
-                        <div className="flex items-center gap-2">
-                          <Building2 className="w-4 h-4 text-gray-400" />
-                          <span className="text-sm">{user.tenant.name}</span>
-                        </div>
+                      {isSuperAdmin ? (
+                        user.tenant ? (
+                          <div className="flex items-center gap-2">
+                            <Building2 className="w-4 h-4 text-gray-400" />
+                            <span className="text-sm">{user.tenant.name}</span>
+                          </div>
+                        ) : (
+                          <Badge variant="warning">System Admin</Badge>
+                        )
                       ) : (
-                        <Badge variant="warning">System Admin</Badge>
+                        user.branch ? (
+                          <span className="text-sm font-medium">{user.branch.name}</span>
+                        ) : (
+                          <span className="text-xs text-gray-400">--</span>
+                        )
                       )}
                     </td>
                     <td className="p-4">
@@ -420,21 +457,39 @@ export default function AdminUsersPage() {
             ) : (
               // Create Mode
               <>
-                <div>
-                  <label className="block text-sm font-bold mb-2">المتجر *</label>
-                  <select
-                    value={form.tenantId}
-                    onChange={(e) => setForm({ ...form, tenantId: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
-                  >
-                    <option value="">اختر المتجر</option>
-                    {tenants.map((tenant) => (
-                      <option key={tenant._id} value={tenant._id}>
-                        {tenant.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {isSuperAdmin ? (
+                  <div>
+                    <label className="block text-sm font-bold mb-2">المتجر *</label>
+                    <select
+                      value={form.tenantId}
+                      onChange={(e) => setForm({ ...form, tenantId: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+                    >
+                      <option value="">اختر المتجر</option>
+                      {tenants.map((tenant) => (
+                        <option key={tenant._id} value={tenant._id}>
+                          {tenant.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-sm font-bold mb-2">الفرع</label>
+                    <select
+                      value={form.branch}
+                      onChange={(e) => setForm({ ...form, branch: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+                    >
+                      <option value="">(اختياري) اختر الفرع</option>
+                      {branches.map((b) => (
+                        <option key={b._id} value={b._id}>
+                          {b.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-bold mb-2">الاسم *</label>
                   <Input

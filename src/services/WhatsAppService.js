@@ -40,9 +40,20 @@ const TEMPLATE_PATTERNS = {
 class WhatsAppService {
   constructor() {
     this.apiUrl = process.env.WHATSAPP_API_URL || 'https://graph.facebook.com/v21.0';
-    this.phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-    this.accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+    this.apiUrl = process.env.WHATSAPP_API_URL || 'https://graph.facebook.com/v21.0';
+    // Removed default global credentials to force per-request config
     this.templates = DEFAULT_TEMPLATES;
+  }
+
+  /**
+   * Helper: Get credentials from config or fallback (for backward compatibility if needed)
+   * @param {object|null} config - { accessToken, phoneNumberId }
+   */
+  getCredentials(config) {
+    return {
+      token: config?.accessToken || process.env.WHATSAPP_ACCESS_TOKEN,
+      phoneId: config?.phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID
+    };
   }
 
   /**
@@ -150,18 +161,16 @@ class WhatsAppService {
   /**
    * Check if WhatsApp is properly configured
    */
-  isConfigured() {
-    this.refreshCredentials();
-    return !!(this.phoneNumberId && this.accessToken && this.accessToken !== 'your_access_token');
+  /**
+   * Check if WhatsApp is properly configured
+   * @param {object} config - { accessToken, phoneNumberId }
+   */
+  isConfigured(config) {
+    const { token, phoneId } = this.getCredentials(config);
+    return !!(phoneId && token && token !== 'your_access_token');
   }
 
-  /**
-   * Refresh credentials from environment (after settings update)
-   */
-  refreshCredentials() {
-    this.phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-    this.accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
-  }
+  // Removed refreshCredentials() as it is no longer needed with stateless approach
 
   /**
    * =====================================================
@@ -177,10 +186,12 @@ class WhatsAppService {
    * @param {Array} bodyParams - Array of parameter values for template body
    * @param {Array} headerParams - Array of parameter values for header (optional)
    * @param {Array} buttonParams - Array of parameter values for buttons (optional)
+   * @param {object} config - Tenant WhatsApp config { accessToken, phoneNumberId }
    */
-  async sendTemplate(to, templateName, languageCode = 'ar', bodyParams = [], headerParams = [], buttonParams = []) {
-    this.refreshCredentials();
-    if (!this.isConfigured()) {
+  async sendTemplate(to, templateName, languageCode = 'ar', bodyParams = [], headerParams = [], buttonParams = [], config = null) {
+    const { token, phoneId } = this.getCredentials(config);
+    
+    if (!this.isConfigured(config)) {
       logger.warn('[WhatsApp] Not configured — skipping template message');
       return { success: false, skipped: true, reason: 'not_configured' };
     }
@@ -236,11 +247,11 @@ class WhatsAppService {
       }
 
       const response = await axios.post(
-        `${this.apiUrl}/${this.phoneNumberId}/messages`,
+        `${this.apiUrl}/${phoneId}/messages`,
         payload,
         {
           headers: {
-            Authorization: `Bearer ${this.accessToken}`,
+            Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
           timeout: 15000,
@@ -290,11 +301,12 @@ class WhatsAppService {
    * @param {string} message - Fallback message text
    * @param {string} templateName - Template to try first
    * @param {Array} templateParams - Template parameters
+   * @param {object} config - Tenant WhatsApp config
    */
-  async smartSend(to, message, templateName, templateParams = []) {
+  async smartSend(to, message, templateName, templateParams = [], config = null) {
     // Try template first (works outside 24h window)
     if (templateName) {
-      const templateResult = await this.sendTemplate(to, templateName, 'ar', templateParams);
+      const templateResult = await this.sendTemplate(to, templateName, 'ar', templateParams, [], [], config);
       if (templateResult.success) {
         return { ...templateResult, method: 'template' };
       }
@@ -302,7 +314,7 @@ class WhatsAppService {
     }
     
     // Fallback to regular message (only works in 24h window)
-    const messageResult = await this.sendMessage(to, message);
+    const messageResult = await this.sendMessage(to, message, config);
     return { ...messageResult, method: 'message' };
   }
 
@@ -315,7 +327,7 @@ class WhatsAppService {
   /**
    * Send customer statement using template
    * Params: {{1}} = customer_name, {{2}} = total_purchases, {{3}} = total_paid, {{4}} = outstanding
-   * @param {object} tenantWhatsapp - tenant.whatsapp config (optional, for dynamic template names)
+   * @param {object} tenantWhatsapp - tenant.whatsapp config (optional, for dynamic template names AND credentials)
    */
   async sendStatementTemplate(phone, customer, tenantWhatsapp = null) {
     const params = [
@@ -327,7 +339,7 @@ class WhatsAppService {
 
     const templateName = this.getTemplateName('statement', tenantWhatsapp);
     const lang = this.getTemplateLanguage('statement', tenantWhatsapp);
-    return this.sendTemplate(phone, templateName, lang, params);
+    return this.sendTemplate(phone, templateName, lang, params, [], [], tenantWhatsapp);
   }
 
   /**
@@ -344,7 +356,7 @@ class WhatsAppService {
 
     const templateName = this.getTemplateName('reminder', tenantWhatsapp);
     const lang = this.getTemplateLanguage('reminder', tenantWhatsapp);
-    return this.sendTemplate(phone, templateName, lang, params);
+    return this.sendTemplate(phone, templateName, lang, params, [], [], tenantWhatsapp);
   }
 
   /**
@@ -362,14 +374,14 @@ class WhatsAppService {
 
     const templateName = this.getTemplateName('invoice', tenantWhatsapp);
     const lang = this.getTemplateLanguage('invoice', tenantWhatsapp);
-    return this.sendTemplate(phone, templateName, lang, params);
+    return this.sendTemplate(phone, templateName, lang, params, [], [], tenantWhatsapp);
   }
 
   /**
    * Send restock request to supplier using template
    * Params: {{1}} = store_name, {{2}} = product_name, {{3}} = quantity, {{4}} = current_stock
    */
-  async sendRestockTemplate(phone, storeName, product, quantity, tenantWhatsapp = null) {
+  async sendRestockTemplate(phone, storeName, product, quantity, tenantWhatsapp = null, overrideTemplateName = null) {
     const params = [
       storeName,
       product.name,
@@ -377,9 +389,9 @@ class WhatsAppService {
       `${product.stock?.quantity || 0} ${product.stock?.unit || 'unit'}`,
     ];
 
-    const templateName = this.getTemplateName('restock', tenantWhatsapp);
+    const templateName = overrideTemplateName || this.getTemplateName('restock', tenantWhatsapp);
     const lang = this.getTemplateLanguage('restock', tenantWhatsapp);
-    return this.sendTemplate(phone, templateName, lang, params);
+    return this.sendTemplate(phone, templateName, lang, params, [], [], tenantWhatsapp);
   }
 
   /**
@@ -396,7 +408,7 @@ class WhatsAppService {
 
     const templateName = this.getTemplateName('payment', tenantWhatsapp);
     const lang = this.getTemplateLanguage('payment', tenantWhatsapp);
-    return this.sendTemplate(phone, templateName, lang, params);
+    return this.sendTemplate(phone, templateName, lang, params, [], [], tenantWhatsapp);
   }
 
   /**
@@ -405,9 +417,10 @@ class WhatsAppService {
    * =====================================================
    */
 
-  async sendMessage(to, message) {
-    this.refreshCredentials();
-    if (!this.isConfigured()) {
+  async sendMessage(to, message, config = null) {
+    const { token, phoneId } = this.getCredentials(config);
+    
+    if (!this.isConfigured(config)) {
       logger.warn('WhatsApp not configured — skipping message');
       return { success: false, skipped: true, reason: 'not_configured' };
     }
@@ -417,7 +430,7 @@ class WhatsAppService {
       logger.info(`[WhatsApp] Attempting to send message to ${phone}`);
 
       const response = await axios.post(
-        `${this.apiUrl}/${this.phoneNumberId}/messages`,
+        `${this.apiUrl}/${phoneId}/messages`,
         {
           messaging_product: 'whatsapp',
           to: phone,
@@ -426,7 +439,7 @@ class WhatsAppService {
         },
         {
           headers: {
-            Authorization: `Bearer ${this.accessToken}`,
+            Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
           timeout: 15000,
@@ -458,9 +471,10 @@ class WhatsAppService {
   /**
    * Upload media to WhatsApp and get media ID
    */
-  async uploadMedia(filepath, mimeType = 'application/pdf') {
-    this.refreshCredentials();
-    if (!this.isConfigured()) {
+  async uploadMedia(filepath, mimeType = 'application/pdf', config = null) {
+    const { token, phoneId } = this.getCredentials(config);
+    
+    if (!this.isConfigured(config)) {
       return { success: false, reason: 'not_configured' };
     }
 
@@ -471,12 +485,12 @@ class WhatsAppService {
       form.append('type', mimeType);
 
       const response = await axios.post(
-        `${this.apiUrl}/${this.phoneNumberId}/media`,
+        `${this.apiUrl}/${phoneId}/media`,
         form,
         {
           headers: {
             ...form.getHeaders(),
-            Authorization: `Bearer ${this.accessToken}`,
+            Authorization: `Bearer ${token}`,
           },
           timeout: 30000,
         }
@@ -492,14 +506,15 @@ class WhatsAppService {
   /**
    * Send document (PDF) via WhatsApp
    */
-  async sendDocument(to, filepath, filename, caption = '') {
-    this.refreshCredentials();
-    if (!this.isConfigured()) {
+  async sendDocument(to, filepath, filename, caption = '', config = null) {
+    const { token, phoneId } = this.getCredentials(config);
+
+    if (!this.isConfigured(config)) {
       return { success: false, skipped: true, reason: 'not_configured' };
     }
 
     try {
-      const uploadResult = await this.uploadMedia(filepath, 'application/pdf');
+      const uploadResult = await this.uploadMedia(filepath, 'application/pdf', config);
       if (!uploadResult.success) {
         return uploadResult;
       }
@@ -508,7 +523,7 @@ class WhatsAppService {
       logger.info(`[WhatsApp] Sending document to ${phone}: ${filename}`);
 
       const response = await axios.post(
-        `${this.apiUrl}/${this.phoneNumberId}/messages`,
+        `${this.apiUrl}/${phoneId}/messages`,
         {
           messaging_product: 'whatsapp',
           to: phone,
@@ -521,7 +536,7 @@ class WhatsAppService {
         },
         {
           headers: {
-            Authorization: `Bearer ${this.accessToken}`,
+            Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
           timeout: 15000,

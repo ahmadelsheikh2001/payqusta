@@ -85,8 +85,16 @@ const tenantScope = (req, res, next) => {
   }
 
   // Attach tenant filter helper
-  // Admin with a tenant gets scoped too; admin without tenant gets global access
-  req.tenantFilter = req.tenantId ? { tenant: req.tenantId } : {};
+  // Admin with a tenant gets scoped too; admin without tenant gets global access ONLY if explicitly designed (e.g. Super Admin)
+  // But here 'admin' usually means Tenant Admin. Super Admin has verifySuperAdmin or isSuperAdmin flag.
+  // We must ensure that if a user has a tenant, they are scoped to it, regardless of role 'admin'.
+  
+  if (req.user && req.user.tenant && !req.user.isSuperAdmin) {
+     req.tenantId = req.user.tenant.toString();
+     req.tenantFilter = { tenant: req.tenantId };
+  } else {
+     req.tenantFilter = req.tenantId ? { tenant: req.tenantId } : {};
+  }
 
   next();
 };

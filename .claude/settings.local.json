@@ -10,7 +10,13 @@
       "Bash(netstat:*)",
       "Bash(findstr:*)",
       "Bash(find . -name \"*.jsx\" -type f -exec wc -l {} +)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(curl:*)",
+      "Bash(python:*)",
+      "Bash(timeout /t 60 /nobreak)",
+      "Bash(cd:*)",
+      "Bash(cmd //c \"del \\\\\\\\?\\\\D:\\\\New folder \\(3\\)\\\\payqusta\\\\nul\")",
+      "Bash(node:*)"
     ]
   }
 }

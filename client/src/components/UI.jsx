@@ -119,7 +119,7 @@ export function Select({ label, options = [], className = '', ...props }) {
 }
 
 // ========== STAT CARD ==========
-export function StatCard({ title, value, icon, change, gradient, delay = 0 }) {
+export function StatCard({ title, value, icon, change, gradient, delay = 0, subtext }) {
   return (
     <div
       className={`relative overflow-hidden rounded-2xl p-5 text-white shadow-lg ${gradient}`}
@@ -131,6 +131,9 @@ export function StatCard({ title, value, icon, change, gradient, delay = 0 }) {
         <div>
           <p className="text-sm opacity-85 font-medium">{title}</p>
           <p className="text-2xl md:text-3xl font-extrabold mt-1">{value}</p>
+          {subtext && (
+            <p className="text-xs mt-1 opacity-90 font-medium">{subtext}</p>
+          )}
           {change && (
             <p className="text-xs mt-2 opacity-80">{change}</p>
           )}

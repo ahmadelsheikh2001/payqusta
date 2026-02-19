@@ -12,6 +12,8 @@ export default function InvoicesPage() {
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ totalPages: 1, totalItems: 0 });
   const [statusFilter, setStatusFilter] = useState('');
+  const [branchFilter, setBranchFilter] = useState('');
+  const [branches, setBranches] = useState([]);
   const [showCreate, setShowCreate] = useState(false);
   const [showPayModal, setShowPayModal] = useState(false);
   const [payInvoice, setPayInvoice] = useState(null);
@@ -29,20 +31,30 @@ export default function InvoicesPage() {
   const [downPayment, setDownPayment] = useState('');
   const LIMIT = 10;
 
+  useEffect(() => {
+    // Load branches from store
+    import('../store').then(({ useAuthStore }) => {
+        useAuthStore.getState().getBranches().then(setBranches);
+    });
+  }, []);
+
   const loadInvoices = useCallback(async () => {
     setLoading(true);
     try {
       const params = { page, limit: LIMIT, sort: '-createdAt' };
       if (statusFilter) params.status = statusFilter;
+      if (branchFilter) params.branch = branchFilter;
       const res = await invoicesApi.getAll(params);
-      setInvoices(res.data.data || []);
+      const data = res.data.data;
+      // Ensure invoices is always an array
+      setInvoices(Array.isArray(data) ? data : (data?.invoices || []));
       setPagination({ totalPages: res.data.pagination?.totalPages || 1, totalItems: res.data.pagination?.totalItems || 0 });
     } catch { toast.error('خطأ في تحميل الفواتير'); }
     finally { setLoading(false); }
-  }, [page, statusFilter]);
+  }, [page, statusFilter, branchFilter]);
 
   useEffect(() => { loadInvoices(); }, [loadInvoices]);
-  useEffect(() => { setPage(1); }, [statusFilter]);
+  useEffect(() => { setPage(1); }, [statusFilter, branchFilter]);
 
   const openCreate = async () => {
     try {
@@ -167,6 +179,18 @@ export default function InvoicesPage() {
           </div>
         </div>
         
+        {/* Branch Filter */}
+        <div className="relative flex-1 sm:w-64">
+           <select 
+            value={branchFilter} 
+            onChange={(e) => setBranchFilter(e.target.value)}
+            className="w-full px-4 py-2.5 rounded-xl border-2 border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 text-sm focus:border-primary-500 transition-all appearance-none cursor-pointer outline-none font-medium"
+          >
+            <option value="">🏢 كل الفروع</option>
+            {branches.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
+          </select>
+        </div>
+        
         <Button 
           icon={<Plus className="w-5 h-5" />} 
           onClick={openCreate}
@@ -192,6 +216,7 @@ export default function InvoicesPage() {
                     <th className="px-6 py-4 font-bold text-gray-500 dark:text-gray-400">رقم الفاتورة</th>
                     <th className="px-6 py-4 font-bold text-gray-500 dark:text-gray-400">العميل</th>
                     <th className="px-6 py-4 font-bold text-gray-500 dark:text-gray-400">التاريخ</th>
+                    <th className="px-6 py-4 font-bold text-gray-500 dark:text-gray-400">الفرع</th>
                     <th className="px-6 py-4 font-bold text-gray-500 dark:text-gray-400">الحالة</th>
                     <th className="px-6 py-4 font-bold text-gray-500 dark:text-gray-400">الإجمالي</th>
                     <th className="px-6 py-4 font-bold text-gray-500 dark:text-gray-400">المتبقي</th>
@@ -212,6 +237,7 @@ export default function InvoicesPage() {
                         {new Date(inv.createdAt).toLocaleDateString('ar-EG')}
                         <div className="text-[10px] text-gray-400">{new Date(inv.createdAt).toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}</div>
                       </td>
+                      <td className="px-6 py-4 text-xs font-semibold text-gray-500">{inv.branch?.name || '—'}</td>
                       <td className="px-6 py-4">
                         {statusBadge(inv.status)}
                         <div className="text-[10px] text-gray-400 mt-1">{methodLabel(inv.paymentMethod)}</div>

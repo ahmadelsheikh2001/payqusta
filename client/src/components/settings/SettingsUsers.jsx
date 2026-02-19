@@ -123,7 +123,7 @@ export default function SettingsUsers() {
           <LoadingSpinner />
         ) : users.length === 0 ? (
           <EmptyState 
-            icon={Users} 
+            icon={<Users className="w-8 h-8" />} 
             title="لا يوجد مستخدمين" 
             description="قم بإضافة موظفين لمساعدتك في إدارة المتجر" 
           />

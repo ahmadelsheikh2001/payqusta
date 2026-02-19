@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Trash2, Plus, Minus, ShoppingBag, ArrowRight } from 'lucide-react';
 import { Card, Button, EmptyState } from '../components/UI';
 
 export default function ShoppingCart() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const isPortal = location.pathname.includes('/portal');
   const [cart, setCart] = useState([]);
 
   useEffect(() => {
@@ -57,7 +59,7 @@ export default function ShoppingCart() {
           description="لم تقم بإضافة أي منتجات بعد"
         />
         <div className="text-center mt-6">
-          <Button onClick={() => navigate('/store/products')}>
+          <Button onClick={() => navigate(isPortal ? '/portal/products' : '/store/products')}>
             تصفح المنتجات
           </Button>
         </div>
@@ -167,7 +169,7 @@ export default function ShoppingCart() {
             </div>
 
             <Button
-              onClick={() => navigate('/store/checkout')}
+              onClick={() => navigate(isPortal ? '/portal/checkout' : '/store/checkout')}
               className="w-full"
               size="lg"
               icon={<ArrowRight className="w-5 h-5" />}
@@ -176,7 +178,7 @@ export default function ShoppingCart() {
             </Button>
 
             <button
-              onClick={() => navigate('/store/products')}
+              onClick={() => navigate(isPortal ? '/portal/products' : '/store/products')}
               className="w-full mt-3 text-center text-primary-600 hover:text-primary-700 font-medium text-sm"
             >
               متابعة التسوق

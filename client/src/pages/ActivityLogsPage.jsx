@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Activity, Filter, Download, Search, Calendar } from 'lucide-react';
-import { api } from '../store';
+import { api, auditLogsApi } from '../store';
 import { Card, Input, Select, Button, Badge, LoadingSpinner, EmptyState } from '../components/UI';
 import Pagination from '../components/Pagination';
 import { format } from 'date-fns';
@@ -43,13 +43,13 @@ export default function ActivityLogsPage() {
   const loadLogs = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({
+      const params = {
         page,
         limit: 25,
         ...Object.fromEntries(Object.entries(filters).filter(([_, v]) => v)),
-      });
+      };
       
-      const res = await api.get(`/admin/audit-logs?${params}`);
+      const res = await auditLogsApi.getLogs(params);
       setLogs(res.data.data);
       setPagination(res.data.pagination);
     } catch (err) {

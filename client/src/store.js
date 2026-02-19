@@ -92,9 +92,16 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
-  logout: () => {
-    localStorage.removeItem('payqusta_token');
-    set({ user: null, tenant: null, token: null, isAuthenticated: false });
+  logout: async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch (error) {
+      console.error('Logout API failed:', error);
+    } finally {
+      localStorage.removeItem('payqusta_token');
+      set({ user: null, tenant: null, token: null, isAuthenticated: false });
+      window.location.href = '/login';
+    }
   },
 
   // --- Multi-Branch Actions ---
@@ -153,7 +160,7 @@ export const useThemeStore = create((set) => ({
 }));
 
 // ========== API HELPERS ==========
-export { api };
+
 
 // Products API
 export const productsApi = {
@@ -185,9 +192,9 @@ export const customersApi = {
   getTop: (limit) => api.get('/customers/top', { params: { limit } }),
   getDebtors: () => api.get('/customers/debtors'),
   getTransactions: (id) => api.get(`/customers/${id}/transactions`),
-  getStatementPDF: (id) => api.get(`/customers/${id}/statement-pdf`),
+  getStatementPDF: (id, params) => api.get(`/customers/${id}/statement-pdf`, { params }),
   sendStatement: (id) => api.post(`/customers/${id}/send-statement`),
-  sendStatementPDF: (id) => api.post(`/customers/${id}/send-statement-pdf`),
+  sendStatementPDF: (id, data) => api.post(`/customers/${id}/send-statement-pdf`, data),
   updateWhatsAppPreferences: (id, data) => api.put(`/customers/${id}/whatsapp-preferences`, data),
 };
 
@@ -222,11 +229,11 @@ export const suppliersApi = {
 
 // Dashboard API
 export const dashboardApi = {
-  getOverview: () => api.get('/dashboard/overview'),
+  getOverview: (params) => api.get('/dashboard/overview', { params }),
   getSalesReport: (params) => api.get('/dashboard/sales-report', { params }),
-  getProfitIntelligence: () => api.get('/dashboard/profit-intelligence'),
-  getRiskScoring: () => api.get('/dashboard/risk-scoring'),
-  getDailyCollections: () => api.get('/dashboard/daily-collections'),
+  getProfitIntelligence: (params) => api.get('/dashboard/profit-intelligence', { params }),
+  getRiskScoring: (params) => api.get('/dashboard/risk-scoring', { params }),
+  getDailyCollections: (params) => api.get('/dashboard/daily-collections', { params }),
 };
 
 // Expenses API
@@ -249,6 +256,13 @@ export const biApi = {
   getAgingReport: () => api.get('/bi/aging-report'),
   getRealProfit: (params) => api.get('/bi/real-profit', { params }),
   whatIfSimulator: (data) => api.post('/bi/what-if', data),
+};
+
+// Audit Logs API (Tenant Level)
+export const auditLogsApi = {
+  getLogs: (params) => api.get('/audit-logs', { params }),
+  getActiveUsers: () => api.get('/audit-logs/active-users'),
+  getLoginHistory: () => api.get('/audit-logs/login-history'),
 };
 
 // Customer Credit API
@@ -276,14 +290,27 @@ export const restockApi = {
   requestRestockBulk: () => api.post('/products/request-restock-bulk'),
 };
 
-// Admin API (Super Admin Only)
+// Super Admin API (New)
+export const superAdminApi = {
+  getTenants: (params) => api.get('/super-admin/tenants', { params }),
+  createTenant: (data) => api.post('/super-admin/tenants', data),
+  updateTenant: (id, data) => api.put(`/super-admin/tenants/${id}`, data),
+  deleteTenant: (id) => api.delete(`/super-admin/tenants/${id}`),
+  impersonateTenant: (id) => api.post(`/super-admin/tenants/${id}/impersonate`),
+  getAnalytics: () => api.get('/super-admin/analytics'),
+  getTenantDetails: (id) => api.get(`/super-admin/tenants/${id}/details`),
+};
+
+// Admin API (Legacy / Tenant Admin)
 export const adminApi = {
   getDashboard: () => api.get('/admin/dashboard'),
   getStatistics: () => api.get('/admin/statistics'),
-  getTenants: (params) => api.get('/admin/tenants', { params }),
-  createTenant: (data) => api.post('/admin/tenants', data),
-  updateTenant: (id, data) => api.put(`/admin/tenants/${id}`, data),
-  deleteTenant: (id) => api.delete(`/admin/tenants/${id}`),
+  getTenants: (params) => api.get('/admin/tenants', { params }), // Legacy
+  createTenant: (data) => api.post('/admin/tenants', data), // Legacy
+  updateTenant: (id, data) => api.put(`/admin/tenants/${id}`, data), // Legacy
+  deleteTenant: (id) => api.delete(`/admin/tenants/${id}`), // Legacy
+  resetTenantPassword: (id, data) => api.post(`/admin/tenants/${id}/reset-password`, data),
+  createBranch: (data) => api.post('/branches', data), // Create branch for tenant
   getUsers: (params) => api.get('/admin/users', { params }),
   createUser: (data) => api.post('/admin/users', data),
   updateUser: (id, data) => api.put(`/admin/users/${id}`, data),

@@ -5,6 +5,7 @@ import { useThemeStore } from '../store';
 import NotificationDropdown from './NotificationDropdown';
 import GlobalSearch from './GlobalSearch';
 import BranchSwitcher from './BranchSwitcher';
+import { useAuthStore } from '../store';
 
 const pageTitles = {
   '/': 'لوحة التحكم',
@@ -18,6 +19,7 @@ const pageTitles = {
 export default function Header({ onMenuClick }) {
   const location = useLocation();
   const { dark, toggleTheme } = useThemeStore();
+  const { tenant, user } = useAuthStore();
   const title = pageTitles[location.pathname] || 'لوحة التحكم';
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -37,14 +39,28 @@ export default function Header({ onMenuClick }) {
   return (
     <>
       <header className="sticky top-0 z-40 flex items-center justify-between px-4 md:px-6 h-16 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-100 dark:border-gray-800">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 overflow-hidden">
           <button
             onClick={onMenuClick}
             className="md:hidden p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 transition-colors"
           >
             <Menu className="w-5 h-5" />
           </button>
-          <h2 className="text-xl font-extrabold">{title}</h2>
+          <div className="flex flex-col md:flex-row md:items-center md:gap-3 overflow-hidden">
+            <h2 className="text-xl font-extrabold whitespace-nowrap">{title}</h2>
+            <div className="hidden md:block w-px h-6 bg-gray-200 dark:bg-gray-700 mx-1" />
+            <div className="flex items-center gap-1.5 text-sm font-bold truncate">
+              {user?.branch?.name ? (
+                <span className="text-primary-600 dark:text-primary-400 whitespace-nowrap">
+                  {user.branch.name}
+                </span>
+              ) : (
+                <span className="text-primary-600 dark:text-primary-400 whitespace-nowrap">
+                  {tenant?.name}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
 
         <div className="flex items-center gap-1.5">

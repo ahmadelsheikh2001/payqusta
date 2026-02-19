@@ -59,7 +59,9 @@ export default function BranchSwitcher() {
     }
   };
 
-  if (!user || (user.role !== 'vendor' && user.role !== 'admin')) return null;
+  if (!user || user.role !== 'admin' || user.isSuperAdmin === false && !user.tenant) return null;
+  // If user is a branch-level vendor, hide the switcher
+  if (user.role === 'vendor' && user.branch) return null;
 
   return (
     <>
@@ -72,7 +74,7 @@ export default function BranchSwitcher() {
             <Store className="w-4 h-4" />
           </div>
           <div className="text-right hidden md:block">
-            <p className="text-xs text-gray-400">الفرع الحالي</p>
+            <p className="text-xs text-gray-400">المتجر</p>
             <p className="text-sm font-bold flex items-center gap-1">
               {tenant?.name}
               <ChevronDown className="w-3 h-3" />
@@ -120,17 +122,21 @@ export default function BranchSwitcher() {
                 )}
               </div>
 
-              <div className="pt-2 border-t border-gray-100 dark:border-gray-800">
-                <button
-                  onClick={() => { setIsOpen(false); setShowCreateModal(true); }}
-                  className="w-full flex items-center justify-center gap-2 p-3 rounded-xl text-sm font-bold text-gray-500 dark:text-gray-400 border-2 border-dashed border-gray-200 dark:border-gray-700 hover:border-primary-500 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/10 transition-all group"
-                >
-                  <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-800 group-hover:bg-primary-100 dark:group-hover:bg-primary-500/20 flex items-center justify-center transition-colors">
-                    <Plus className="w-4 h-4" />
-                  </div>
-                  إضافة فرع جديد
-                </button>
-              </div>
+
+              {/* Only Admin/Super Admin can add branches */}
+              {(user?.role === 'admin' || user?.isSuperAdmin) && (
+                <div className="pt-2 border-t border-gray-100 dark:border-gray-800">
+                  <button
+                    onClick={() => { setIsOpen(false); setShowCreateModal(true); }}
+                    className="w-full flex items-center justify-center gap-2 p-3 rounded-xl text-sm font-bold text-gray-500 dark:text-gray-400 border-2 border-dashed border-gray-200 dark:border-gray-700 hover:border-primary-500 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/10 transition-all group"
+                  >
+                    <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-800 group-hover:bg-primary-100 dark:group-hover:bg-primary-500/20 flex items-center justify-center transition-colors">
+                      <Plus className="w-4 h-4" />
+                    </div>
+                    إضافة فرع جديد
+                  </button>
+                </div>
+              )}
             </div>
           </>
         )}

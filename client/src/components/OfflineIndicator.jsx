@@ -8,7 +8,6 @@ export default function OfflineIndicator() {
   const { isOnline, wasOffline } = useOnlineStatus();
   const [syncing, setSyncing] = React.useState(false);
   const [pendingCount, setPendingCount] = React.useState(0);
-
   React.useEffect(() => {
     loadPendingCount();
   }, []);

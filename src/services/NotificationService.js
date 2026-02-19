@@ -47,7 +47,7 @@ class NotificationService {
   }
 
   /**
-   * Create and broadcast a notification
+   * Create and broadcast a notification to a specific user
    */
   async send({ tenant, recipient, type, title, message, icon, color, link, relatedModel, relatedId }) {
     try {
@@ -57,7 +57,7 @@ class NotificationService {
 
       // Broadcast via SSE
       this.broadcastToUser(recipient, {
-        id: notification._id,
+        _id: notification._id,
         type: notification.type,
         title: notification.title,
         message: notification.message,
@@ -65,6 +65,7 @@ class NotificationService {
         color: notification.color,
         link: notification.link,
         createdAt: notification.createdAt,
+        isRead: false,
       });
 
       return notification;
@@ -74,17 +75,40 @@ class NotificationService {
   }
 
   /**
-   * Notify the vendor (tenant owner) about something
+   * Notify all admins and the vendor of a tenant
+   * This ensures that store managers and owners both see important alerts
    */
-  async notifyVendor(tenantId, { type, title, message, icon, color, link, relatedModel, relatedId }) {
-    const vendor = await User.findOne({ tenant: tenantId, role: 'vendor' });
-    if (!vendor) return;
+  async notifyTenantAdmins(tenantId, { type, title, message, icon, color, link, relatedModel, relatedId }) {
+    try {
+      // Find all users with role 'admin' or 'vendor' in this tenant
+      // Also potentially 'manager' if that role exists, but for now 'admin' and 'vendor' are key
+      const recipients = await User.find({
+        tenant: tenantId,
+        role: { $in: ['vendor', 'admin'] },
+        isActive: true
+      }).select('_id');
 
-    return this.send({
-      tenant: tenantId,
-      recipient: vendor._id,
-      type, title, message, icon, color, link, relatedModel, relatedId,
-    });
+      if (!recipients.length) return;
+
+      const notifications = recipients.map(user => 
+        this.send({
+          tenant: tenantId,
+          recipient: user._id,
+          type, title, message, icon, color, link, relatedModel, relatedId,
+        })
+      );
+
+      await Promise.all(notifications);
+    } catch (err) {
+      logger.error(`notifyTenantAdmins error: ${err.message}`);
+    }
+  }
+
+  /**
+   * Legacy wrapper for backward compatibility, now uses notifyTenantAdmins
+   */
+  async notifyVendor(tenantId, payload) {
+    return this.notifyTenantAdmins(tenantId, payload);
   }
 
   // ============ SPECIFIC NOTIFICATION METHODS ============
@@ -94,10 +118,12 @@ class NotificationService {
    */
   async onInvoiceCreated(tenantId, invoice, customerName) {
     const fmt = (n) => (n || 0).toLocaleString('ar-EG');
-    return this.notifyVendor(tenantId, {
+    return this.notifyTenantAdmins(tenantId, {
       type: 'invoice_created',
       title: 'فاتورة جديدة',
       message: `تم إنشاء فاتورة ${invoice.invoiceNumber} للعميل ${customerName} بمبلغ ${fmt(invoice.totalAmount)} ج.م`,
+      icon: 'file-text',
+      color: 'primary',
       link: '/invoices',
       relatedModel: 'Invoice',
       relatedId: invoice._id,
@@ -109,10 +135,12 @@ class NotificationService {
    */
   async onPaymentReceived(tenantId, invoice, amount, customerName) {
     const fmt = (n) => (n || 0).toLocaleString('ar-EG');
-    return this.notifyVendor(tenantId, {
+    return this.notifyTenantAdmins(tenantId, {
       type: 'payment_received',
       title: 'تم استلام دفعة 💰',
       message: `استلمت ${fmt(amount)} ج.م من ${customerName} — فاتورة ${invoice.invoiceNumber}. المتبقي: ${fmt(invoice.remainingAmount)} ج.م`,
+      icon: 'credit-card',
+      color: 'success',
       link: '/invoices',
       relatedModel: 'Invoice',
       relatedId: invoice._id,
@@ -125,10 +153,12 @@ class NotificationService {
   async onInstallmentDue(tenantId, customerName, invoiceNumber, amount, dueDate) {
     const fmt = (n) => (n || 0).toLocaleString('ar-EG');
     const dateStr = new Date(dueDate).toLocaleDateString('ar-EG');
-    return this.notifyVendor(tenantId, {
+    return this.notifyTenantAdmins(tenantId, {
       type: 'installment_due',
       title: 'قسط مستحق غداً ⏰',
       message: `العميل ${customerName} عليه قسط ${fmt(amount)} ج.م مستحق ${dateStr} — فاتورة ${invoiceNumber}`,
+      icon: 'clock',
+      color: 'warning',
       link: '/invoices',
     });
   }
@@ -138,10 +168,12 @@ class NotificationService {
    */
   async onInstallmentOverdue(tenantId, customerName, invoiceNumber, amount) {
     const fmt = (n) => (n || 0).toLocaleString('ar-EG');
-    return this.notifyVendor(tenantId, {
+    return this.notifyTenantAdmins(tenantId, {
       type: 'installment_overdue',
       title: 'قسط متأخر! ⚠️',
       message: `العميل ${customerName} متأخر عن قسط ${fmt(amount)} ج.م — فاتورة ${invoiceNumber}`,
+      icon: 'alert-triangle',
+      color: 'danger',
       link: '/invoices',
     });
   }
@@ -150,10 +182,12 @@ class NotificationService {
    * Low stock alert
    */
   async onLowStock(tenantId, product) {
-    return this.notifyVendor(tenantId, {
+    return this.notifyTenantAdmins(tenantId, {
       type: 'low_stock',
       title: 'مخزون منخفض ⚠️',
       message: `المنتج "${product.name}" وصل ${product.stock.quantity} ${product.stock.unit} فقط (الحد الأدنى: ${product.stock.minQuantity})`,
+      icon: 'package-x',
+      color: 'warning',
       link: '/products',
       relatedModel: 'Product',
       relatedId: product._id,
@@ -164,10 +198,12 @@ class NotificationService {
    * Out of stock alert
    */
   async onOutOfStock(tenantId, product) {
-    return this.notifyVendor(tenantId, {
+    return this.notifyTenantAdmins(tenantId, {
       type: 'out_of_stock',
       title: 'منتج نفذ من المخزون! 🚨',
       message: `المنتج "${product.name}" نفذ تماماً من المخزون`,
+      icon: 'package-x',
+      color: 'danger',
       link: '/products',
       relatedModel: 'Product',
       relatedId: product._id,
@@ -179,10 +215,12 @@ class NotificationService {
    */
   async onSupplierPaymentDue(tenantId, supplierName, amount, dueDate) {
     const fmt = (n) => (n || 0).toLocaleString('ar-EG');
-    return this.notifyVendor(tenantId, {
+    return this.notifyTenantAdmins(tenantId, {
       type: 'supplier_payment_due',
       title: 'خلي بالك! عليك قسط مورد 🚛',
       message: `عليك قسط ${fmt(amount)} ج.م للمورد ${supplierName} مستحق ${new Date(dueDate).toLocaleDateString('ar-EG')}`,
+      icon: 'truck',
+      color: 'warning',
       link: '/suppliers',
     });
   }
@@ -191,10 +229,12 @@ class NotificationService {
    * New customer created
    */
   async onNewCustomer(tenantId, customerName) {
-    return this.notifyVendor(tenantId, {
+    return this.notifyTenantAdmins(tenantId, {
       type: 'new_customer',
       title: 'عميل جديد 🎉',
       message: `تم إضافة العميل "${customerName}" بنجاح`,
+      icon: 'user-plus',
+      color: 'success',
       link: '/customers',
     });
   }
@@ -203,11 +243,42 @@ class NotificationService {
    * Customer upgraded to VIP
    */
   async onCustomerVIP(tenantId, customerName) {
-    return this.notifyVendor(tenantId, {
+    return this.notifyTenantAdmins(tenantId, {
       type: 'customer_vip',
       title: 'ترقية عميل ⭐',
       message: `العميل "${customerName}" ترقى لعميل VIP! النقاط تخطت 2000`,
+      icon: 'star',
+      color: 'primary',
       link: '/customers',
+    });
+  }
+
+  /**
+   * Expense created
+   */
+  async onExpenseCreated(tenantId, { title, amount, category, createdByName }) {
+    const fmt = (n) => (n || 0).toLocaleString('ar-EG');
+    return this.notifyTenantAdmins(tenantId, {
+      type: 'expense_created',
+      title: 'تم تسجيل مصروف 💸',
+      message: `${createdByName} سجل مصروف "${title}" بقيمة ${fmt(amount)} ج.م`,
+      icon: 'credit-card',
+      color: 'gray',
+      link: '/expenses',
+    });
+  }
+
+  /**
+   * Branch created
+   */
+  async onBranchCreated(tenantId, branchName, creatorName) {
+    return this.notifyTenantAdmins(tenantId, {
+      type: 'branch_created',
+      title: 'تم افتتاح فرع جديد! 🏪',
+      message: `تم إنشاء فرع "${branchName}" بنجاح بواسطة ${creatorName}`,
+      icon: 'store', // Lucide icon name, might need mapping in frontend but 'store' is standard or mapped to something similar
+      color: 'success',
+      link: '/settings', // Or dashboard
     });
   }
 }

@@ -57,7 +57,19 @@ export default function AdminAuditLogsPage() {
       case 'update':
         return <Activity className="w-4 h-4" />;
       case 'delete':
+      case 'bulk_delete':
         return <XCircle className="w-4 h-4" />;
+      case 'login':
+        return <CheckCircle className="w-4 h-4 text-emerald-500" />;
+      case 'logout':
+        return <Activity className="w-4 h-4 text-gray-500" />;
+      case 'payment':
+        return <CheckCircle className="w-4 h-4 text-blue-500" />;
+      case 'stock_change':
+        return <Activity className="w-4 h-4 text-amber-500" />;
+        case 'import':
+        case 'restore':
+          return <Activity className="w-4 h-4 text-purple-500" />;
       case 'view':
         return <Eye className="w-4 h-4" />;
       default:
@@ -85,7 +97,14 @@ export default function AdminAuditLogsPage() {
       create: 'إنشاء',
       update: 'تحديث',
       delete: 'حذف',
+      bulk_delete: 'حذف جماعي',
       view: 'عرض',
+      login: 'تسجيل دخول',
+      logout: 'تسجيل خروج',
+      payment: 'تسجيل دفعة',
+      stock_change: 'تغيير مخزون',
+      import: 'استيراد',
+      restore: 'استعادة',
     };
     return labels[action] || action;
   };
@@ -126,27 +145,40 @@ export default function AdminAuditLogsPage() {
             <div className="relative">
               <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input
-                placeholder="بحث في السجلات..."
+                placeholder="بحث في السجلات (اسم، بريد، إجراء...)"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pr-10"
+                className="pr-10 h-11"
               />
             </div>
             <select
               value={actionFilter}
               onChange={(e) => setActionFilter(e.target.value)}
-              className="px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:ring-2 focus:ring-primary-500"
+              className="px-4 h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:ring-2 focus:ring-primary-500"
             >
               <option value="">كل الإجراءات</option>
+              {/* CRUD */}
               <option value="create">إنشاء</option>
               <option value="update">تحديث</option>
               <option value="delete">حذف</option>
-              <option value="view">عرض</option>
+              <option value="bulk_delete">حذف جماعي</option>
+              
+              {/* Business Actions */}
+              <option value="payment">تسجيل دفعة</option>
+              <option value="stock_change">تغيير مخزون</option>
+              
+              {/* System Actions */}
+              <option value="import">استيراد بيانات</option>
+              <option value="restore">استعادة نسخة احتياطية</option>
+              
+              {/* Auth */}
+              <option value="login">تسجيل دخول</option>
+              <option value="logout">تسجيل خروج</option>
             </select>
             <select
               value={resourceFilter}
               onChange={(e) => setResourceFilter(e.target.value)}
-              className="px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:ring-2 focus:ring-primary-500"
+              className="px-4 h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:ring-2 focus:ring-primary-500"
             >
               <option value="">كل الموارد</option>
               <option value="tenant">متجر</option>
@@ -156,6 +188,7 @@ export default function AdminAuditLogsPage() {
               <option value="invoice">فاتورة</option>
               <option value="supplier">مورد</option>
               <option value="expense">مصروف</option>
+              <option value="auth">جلسات (دخول/خروج)</option>
             </select>
           </div>
         </div>
