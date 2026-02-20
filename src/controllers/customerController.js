@@ -58,6 +58,7 @@ class CustomerController {
     const customerData = {
       ...req.body,
       tenant: tenantId,
+      barcode: req.body.barcode || undefined, // Allow manual barcode entry
       financials: {
         ...req.body.financials,
         creditLimit: req.body.creditLimit !== undefined ? req.body.creditLimit : (req.body.financials?.creditLimit || 10000),
@@ -68,16 +69,22 @@ class CustomerController {
       },
     };
 
+    // Manual uniqueness check for barcode
+    if (customerData.barcode) {
+      const existing = await Customer.findOne({ tenant: tenantId, barcode: customerData.barcode });
+      if (existing) return next(new AppError('الباركود مستخدم بالفعل لعميل آخر في هذا المتجر', 409));
+    }
+
     const customer = await Customer.create(customerData);
 
     // Send Notification
-    NotificationService.onNewCustomer(tenantId, customer.name).catch(() => {});
+    NotificationService.onNewCustomer(tenantId, customer.name).catch(() => { });
 
     ApiResponse.created(res, customer, 'تم إضافة العميل بنجاح');
   });
 
   update = catchAsync(async (req, res, next) => {
-    const allowedFields = ['name', 'phone', 'email', 'address', 'nationalId', 'notes', 'tags', 'tier'];
+    const allowedFields = ['name', 'phone', 'email', 'address', 'nationalId', 'notes', 'tags', 'tier', 'barcode'];
     const updateData = {};
     allowedFields.forEach((f) => { if (req.body[f] !== undefined) updateData[f] = req.body[f]; });
 
@@ -157,6 +164,7 @@ class CustomerController {
         name: customer.name,
         phone: customer.phone,
         tier: customer.tier,
+        barcode: customer.barcode,
         financials: customer.financials,
         salesBlocked: customer.salesBlocked,
         salesBlockedReason: customer.salesBlockedReason,
@@ -327,7 +335,7 @@ class CustomerController {
       const totalAmount = invoices.reduce((s, i) => s + i.totalAmount, 0);
       const totalPaidInv = invoices.reduce((s, i) => s + i.paidAmount, 0);
       const totalRemaining = invoices.reduce((s, i) => s + i.remainingAmount, 0);
-      
+
       message += `━━━━━━━━━━━━━━━━━━\n`;
       message += `📊 *الإجمالي*\n`;
       message += `المبيعات: ${totalAmount.toLocaleString('ar-EG')} ج.م\n`;
@@ -400,7 +408,7 @@ class CustomerController {
 
     // First, try to send using Template (works outside 24h window)
     const templateResult = await WhatsAppService.sendStatementTemplate(customer.phone, customer, tenant?.whatsapp);
-    
+
     if (templateResult.success) {
       logger.info(`[Statement] Template sent successfully: ${templateResult.messageId}`);
     } else {
@@ -434,7 +442,7 @@ class CustomerController {
       message += `✅ المدفوع: ${Helpers.formatCurrency(customer.financials?.totalPaid || 0)}\n`;
       message += `${outstanding > 0 ? '🔴' : '🟢'} المتبقي: ${Helpers.formatCurrency(outstanding)}\n`;
       message += `━━━━━━━━━━━━━━━\n`;
-      
+
       if (invoices.length > 0) {
         message += `\n📋 آخر 5 معاملات:\n`;
         invoices.slice(0, 5).forEach((inv, i) => {
@@ -442,11 +450,11 @@ class CustomerController {
           message += `${i + 1}. ${inv.invoiceNumber} — ${Helpers.formatCurrency(inv.totalAmount)} ${icon}\n`;
         });
       }
-      
+
       message += `\n📅 ${new Date().toLocaleDateString('ar-EG')}\n🏪 ${tenant?.name || 'PayQusta'}`;
-      
+
       const textResult = await WhatsAppService.sendMessage(customer.phone, message, tenant?.whatsapp);
-      
+
       // All methods failed - inform user about 24h window
       if (!textResult.success) {
         return ApiResponse.success(res, {
@@ -464,9 +472,9 @@ class CustomerController {
       method: whatsappResult.success ? 'document' : 'text',
       pdfSent: whatsappResult.success,
       templateSent: templateResult.success,
-    }, whatsappResult.success 
-        ? 'تم إرسال كشف الحساب وهناك رسالة PDF في الطريق ✅' 
-        : 'تم إرسال الملخص. لإرسال الـ PDF يجب أن يرد العميل أولاً (نافذة 24 ساعة) ⚠️');
+    }, whatsappResult.success
+      ? 'تم إرسال كشف الحساب وهناك رسالة PDF في الطريق ✅'
+      : 'تم إرسال الملخص. لإرسال الـ PDF يجب أن يرد العميل أولاً (نافذة 24 ساعة) ⚠️');
   });
 
   /**

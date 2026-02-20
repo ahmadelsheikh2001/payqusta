@@ -87,9 +87,9 @@ router.post('/auth/add-user', authorize('vendor', 'admin'), checkLimit('user'), 
 router.post('/auth/switch-tenant', tenantController.switchTenant);
 
 // --- Tenant / Branches ---
-router.post('/tenants/branch', authorize('vendor', 'admin'), tenantController.createBranch);
+// Note: /tenants/branch removed - use /branches instead (branchController is more complete)
 router.use('/branches', require('./branchRoutes'));
-router.get('/tenants/my-branches', authorize('vendor', 'admin', 'coordinator'), tenantController.getMyBranches);
+router.get('/tenants/my-tenants', authorize('vendor', 'admin', 'coordinator'), tenantController.getMyBranches); // Renamed for clarity
 
 // --- Dashboard ---
 router.get('/dashboard/overview', authorize('vendor', 'admin', 'coordinator'), dashboardController.getOverview);
@@ -160,6 +160,17 @@ router.put('/settings/user', settingsController.updateUser);
 router.put('/settings/password', settingsController.changePassword);
 router.put('/settings/categories', authorize('vendor', 'admin'), settingsController.updateCategories);
 router.delete('/settings/categories/:name', authorize('vendor', 'admin'), settingsController.deleteCategory);
+
+// --- Owner Management (Returns, KYC, Support) ---
+const ownerMgmt = require('../controllers/ownerManagementController');
+router.get('/manage/returns', authorize('vendor', 'admin'), ownerMgmt.getReturns);
+router.patch('/manage/returns/:id', authorize('vendor', 'admin'), ownerMgmt.updateReturn);
+router.get('/manage/documents', authorize('vendor', 'admin'), ownerMgmt.getDocuments);
+router.patch('/manage/documents/:customerId/:docId', authorize('vendor', 'admin'), ownerMgmt.reviewDocument);
+router.get('/manage/support', authorize('vendor', 'admin'), ownerMgmt.getSupportMessages);
+router.get('/manage/support/:id', authorize('vendor', 'admin'), ownerMgmt.getSupportMessage);
+router.post('/manage/support/:id/reply', authorize('vendor', 'admin'), ownerMgmt.replySupportMessage);
+router.patch('/manage/support/:id/close', authorize('vendor', 'admin'), ownerMgmt.closeSupportMessage);
 
 // --- Roles & Permissions ---
 const roleController = require('../controllers/roleController');

@@ -18,5 +18,6 @@ router.post('/send-whatsapp-message', authorize('vendor', 'admin', 'coordinator'
 router.post('/:id/pay', authorize('vendor', 'admin', 'coordinator'), auditLog('payment', 'invoice'), invoiceController.recordPayment);
 router.post('/:id/pay-all', authorize('vendor', 'admin'), auditLog('payment', 'invoice'), invoiceController.payAll);
 router.post('/:id/send-whatsapp', authorize('vendor', 'admin', 'coordinator'), invoiceController.sendWhatsApp);
+router.patch('/:id/order-status', authorize('vendor', 'admin', 'coordinator'), invoiceController.updateOrderStatus);
 
 module.exports = router;

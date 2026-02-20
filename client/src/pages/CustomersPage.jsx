@@ -24,8 +24,8 @@ export default function CustomersPage() {
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ name: '', phone: '', email: '', address: '', notes: '', creditLimit: 10000 });
-  
+  const [form, setForm] = useState({ name: '', phone: '', email: '', address: '', notes: '', creditLimit: 10000, barcode: '' });
+
   // Customer Details Modal
   const [showDetails, setShowDetails] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -35,7 +35,7 @@ export default function CustomersPage() {
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
   const [expandedInvoice, setExpandedInvoice] = useState(null);
-  
+
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
@@ -49,12 +49,12 @@ export default function CustomersPage() {
 
   useEffect(() => {
     // Load branches
-    customersApi.getAll({}).then(() => {}); // Just to wake up
+    customersApi.getAll({}).then(() => { }); // Just to wake up
     // We need a way to get branches. Typically useAuthStore or a dedicated API.
     // Assuming we can get it from an API or just mocking for now since we added it to model.
     // Let's use the one from store if available or just fetch manually.
     import('../store').then(({ useAuthStore }) => {
-        useAuthStore.getState().getBranches().then(setBranches);
+      useAuthStore.getState().getBranches().then(setBranches);
     });
   }, []);
 
@@ -74,17 +74,18 @@ export default function CustomersPage() {
   useEffect(() => { load(); }, [load]);
   useEffect(() => { setPage(1); }, [search, tierFilter, branchFilter]);
 
-  const openAdd = () => { setEditId(null); setForm({ name: '', phone: '', email: '', address: '', notes: '', creditLimit: 10000 }); setShowModal(true); };
+  const openAdd = () => { setEditId(null); setForm({ name: '', phone: '', email: '', address: '', notes: '', creditLimit: 10000, barcode: '' }); setShowModal(true); };
   const openEdit = (c, e) => {
     e?.stopPropagation();
     setEditId(c._id);
-    setForm({ 
-      name: c.name, 
-      phone: c.phone, 
-      email: c.email || '', 
-      address: c.address || '', 
+    setForm({
+      name: c.name,
+      phone: c.phone,
+      email: c.email || '',
+      address: c.address || '',
       notes: c.notes || '',
-      creditLimit: c.financials?.creditLimit || 10000 
+      creditLimit: c.financials?.creditLimit || 10000,
+      barcode: c.barcode || ''
     });
     setShowModal(true);
   };
@@ -97,7 +98,7 @@ export default function CustomersPage() {
     setCreditAssessment(null);
     setCustomerTransactions([]);
     setExpandedInvoice(null);
-    
+
     try {
       const [transRes, creditRes] = await Promise.all([
         customersApi.getTransactions(customer._id),
@@ -163,7 +164,7 @@ export default function CustomersPage() {
     // We use the existing printRef content which matches the user's preferred design.
     const printContent = printRef.current;
     if (!printContent) return;
-    
+
     // Create a hidden iframe or window for printing
     const printWindow = window.open('', '_blank');
     printWindow.document.write(`
@@ -217,7 +218,7 @@ export default function CustomersPage() {
           </div>
           <div class="summary-item">
              <h3>صافي المستحق</h3>
-             <p style="color: ${(selectedCustomer.financials?.outstandingBalance||0)>0?'red':'green'}">${fmt(selectedCustomer.financials?.outstandingBalance)} ج.م</p>
+             <p style="color: ${(selectedCustomer.financials?.outstandingBalance || 0) > 0 ? 'red' : 'green'}">${fmt(selectedCustomer.financials?.outstandingBalance)} ج.م</p>
           </div>
         </div>
         
@@ -235,7 +236,7 @@ export default function CustomersPage() {
   const confirmWhatsApp = async () => {
     if (!selectedCustomer?.phone) return toast.error('رقم الهاتف غير متوفر');
     setSendingWhatsApp(true);
-    
+
     try {
       const response = await customersApi.sendStatementPDF(selectedCustomer._id, dateFilter);
       if (response.data.data?.whatsappSent) {
@@ -328,7 +329,7 @@ export default function CustomersPage() {
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث بالاسم أو الهاتف..."
             className="w-full pr-10 pl-4 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:border-primary-500 transition-all" />
         </div>
-        
+
         {/* Branch Filter */}
         <select value={branchFilter} onChange={(e) => setBranchFilter(e.target.value)}
           className="px-3 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm cursor-pointer">
@@ -451,6 +452,7 @@ export default function CustomersPage() {
           <Input label="رقم الهاتف *" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="01XXXXXXXXX" />
           <Input label="البريد الإلكتروني" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
           <Input label="العنوان" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+          <Input label="الباركود (barcode)" value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} placeholder="اتركه فارغاً للتوليد التلقائي" />
           <Input label="الحد الائتماني (ج.م)" type="number" value={form.creditLimit} onChange={(e) => setForm({ ...form, creditLimit: Number(e.target.value) })} />
         </div>
         <div className="flex justify-end gap-3 mt-6">
@@ -478,6 +480,7 @@ export default function CustomersPage() {
                   </h2>
                   <div className="flex items-center gap-3 text-sm text-gray-500">
                     <span className="flex items-center gap-1"><Phone className="w-3.5 h-3.5" />{selectedCustomer.phone}</span>
+                    <span className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded text-[10px] font-mono"><Users className="w-3 h-3" />{selectedCustomer.barcode || '---'}</span>
                   </div>
                 </div>
               </div>
@@ -656,7 +659,7 @@ export default function CustomersPage() {
                         {customerTransactions.map((inv) => (
                           <div key={inv._id} className="border border-gray-100 dark:border-gray-800 rounded-xl overflow-hidden">
                             {/* Invoice Header - Clickable */}
-                            <div 
+                            <div
                               className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors"
                               onClick={() => toggleInvoiceExpand(inv._id)}
                             >
@@ -781,14 +784,14 @@ export default function CustomersPage() {
                   <div className="info-box"><label>رقم الهاتف</label><span dir="ltr">{selectedCustomer.phone}</span></div>
                   <div className="info-box"><label>الحالة</label><span>{selectedCustomer.tier === 'vip' ? '⭐ VIP' : selectedCustomer.tier === 'premium' ? 'Premium' : 'عادي'}</span></div>
                   <div className="info-box"><label>إجمالي المشتريات</label><span>{fmt(selectedCustomer.financials?.totalPurchases)} ج.م</span></div>
-                  <div className="info-box"><label>إجمالي المدفوع</label><span style={{color:'green'}}>{fmt(selectedCustomer.financials?.totalPaid)} ج.م</span></div>
-                  <div className="info-box"><label>المتبقي</label><span style={{color:(selectedCustomer.financials?.outstandingBalance||0)>0?'red':'green'}}>{fmt(selectedCustomer.financials?.outstandingBalance)} ج.م</span></div>
+                  <div className="info-box"><label>إجمالي المدفوع</label><span style={{ color: 'green' }}>{fmt(selectedCustomer.financials?.totalPaid)} ج.م</span></div>
+                  <div className="info-box"><label>المتبقي</label><span style={{ color: (selectedCustomer.financials?.outstandingBalance || 0) > 0 ? 'red' : 'green' }}>{fmt(selectedCustomer.financials?.outstandingBalance)} ج.م</span></div>
                 </div>
-                <h3 style={{marginTop:'20px',marginBottom:'10px'}}>سجل المعاملات</h3>
+                <h3 style={{ marginTop: '20px', marginBottom: '10px' }}>سجل المعاملات</h3>
                 {customerTransactions.map((inv) => (
-                  <div key={inv._id} style={{marginBottom:'20px',border:'1px solid #ddd',padding:'10px'}}>
+                  <div key={inv._id} style={{ marginBottom: '20px', border: '1px solid #ddd', padding: '10px' }}>
                     <p><strong>فاتورة: {inv.invoiceNumber}</strong> — {new Date(inv.createdAt).toLocaleDateString('ar-EG')}</p>
-                    <table className="items-table" style={{marginTop:'10px'}}>
+                    <table className="items-table" style={{ marginTop: '10px' }}>
                       <thead><tr><th>المنتج</th><th>الكمية</th><th>السعر</th><th>الإجمالي</th></tr></thead>
                       <tbody>
                         {(inv.items || []).map((item, idx) => (
@@ -801,14 +804,14 @@ export default function CustomersPage() {
                         ))}
                       </tbody>
                     </table>
-                    <p style={{marginTop:'5px'}}>
-                      <strong>الإجمالي:</strong> {fmt(inv.totalAmount)} ج.م | 
-                      <strong className="paid"> المدفوع:</strong> {fmt(inv.paidAmount)} ج.م | 
+                    <p style={{ marginTop: '5px' }}>
+                      <strong>الإجمالي:</strong> {fmt(inv.totalAmount)} ج.م |
+                      <strong className="paid"> المدفوع:</strong> {fmt(inv.paidAmount)} ج.م |
                       <strong className={inv.remainingAmount > 0 ? 'overdue' : 'paid'}> المتبقي:</strong> {fmt(inv.remainingAmount)} ج.م
                     </p>
                   </div>
                 ))}
-                <div className="footer" style={{marginTop:'30px',textAlign:'center',fontSize:'10px',color:'#999'}}>
+                <div className="footer" style={{ marginTop: '30px', textAlign: 'center', fontSize: '10px', color: '#999' }}>
                   <p>تم إنشاء هذا الكشف بواسطة PayQusta — {new Date().toLocaleString('ar-EG')}</p>
                 </div>
               </div>
@@ -819,23 +822,23 @@ export default function CustomersPage() {
       {/* Date Range Modal - Moved to end for Z-Index */}
       <Modal open={showDateModal} onClose={() => setShowDateModal(false)} title="تحديد الفترة (اختياري)">
         <div className="space-y-4">
-           <div className="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-lg text-sm">
-             <p>اترك التواريخ فارغة لطباعة <b>كل المعاملات</b>.</p>
-           </div>
-           <div className="grid grid-cols-2 gap-4">
-             <Input 
-               label="من تاريخ" 
-               type="date" 
-               value={dateFilter.startDate} 
-               onChange={(e) => setDateFilter({ ...dateFilter, startDate: e.target.value })} 
-             />
-             <Input 
-               label="إلى تاريخ" 
-               type="date" 
-               value={dateFilter.endDate} 
-               onChange={(e) => setDateFilter({ ...dateFilter, endDate: e.target.value })} 
-             />
-           </div>
+          <div className="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-lg text-sm">
+            <p>اترك التواريخ فارغة لطباعة <b>كل المعاملات</b>.</p>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="من تاريخ"
+              type="date"
+              value={dateFilter.startDate}
+              onChange={(e) => setDateFilter({ ...dateFilter, startDate: e.target.value })}
+            />
+            <Input
+              label="إلى تاريخ"
+              type="date"
+              value={dateFilter.endDate}
+              onChange={(e) => setDateFilter({ ...dateFilter, endDate: e.target.value })}
+            />
+          </div>
         </div>
         <div className="flex justify-end gap-3 mt-6">
           <Button variant="ghost" onClick={() => setShowDateModal(false)}>إلغاء</Button>

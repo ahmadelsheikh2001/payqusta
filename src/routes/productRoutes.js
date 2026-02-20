@@ -18,7 +18,8 @@ router.post('/', authorize('vendor', 'admin'), checkLimit('product'), auditLog('
 router.put('/:id', authorize('vendor', 'admin'), auditLog('update', 'product'), productController.update);
 router.delete('/:id', authorize('vendor', 'admin'), auditLog('delete', 'product'), productController.delete);
 router.patch('/:id/stock', authorize('vendor', 'admin', 'coordinator'), auditLog('stock_change', 'product'), productController.updateStock);
-router.post('/:id/upload-image', authorize('vendor', 'admin'), uploadSingle, productController.uploadImage);
+const { uploadMultiple } = require('../middleware/upload');
+router.post('/:id/upload-image', authorize('vendor', 'admin'), uploadMultiple, productController.uploadImage);
 router.delete('/:id/images/:imageUrl', authorize('vendor', 'admin'), productController.deleteImage);
 
 // Restock

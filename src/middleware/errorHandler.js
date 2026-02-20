@@ -15,7 +15,16 @@ const handleCastError = (err) => {
 
 const handleDuplicateKey = (err) => {
   const field = Object.keys(err.keyValue)[0];
-  return new AppError(`القيمة "${err.keyValue[field]}" مكررة في الحقل "${field}"`, 409);
+  const translations = {
+    barcode: 'الباركود',
+    sku: 'كود SKU',
+    phone: 'رقم الهاتف',
+    email: 'البريد الإلكتروني',
+    nationalId: 'الرقم القومي',
+    whatsappNumber: 'رقم واتساب',
+  };
+  const fieldName = translations[field] || field;
+  return new AppError(`القيمة "${err.keyValue[field] || ''}" مستخدمة بالفعل في حقل "${fieldName}"`, 409);
 };
 
 const handleValidationError = (err) => {

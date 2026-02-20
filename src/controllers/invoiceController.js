@@ -22,15 +22,20 @@ class InvoiceController {
    * Get all invoices with pagination and filtering
    */
   getAll = catchAsync(async (req, res, next) => {
-    const { page = 1, limit = 50, search, status, customerId, startDate, endDate, sortBy = '-createdAt' } = req.query;
+    const { page = 1, limit = 50, search, status, orderStatus, source, customerId, startDate, endDate, sortBy = '-createdAt', branch } = req.query;
 
     const filter = { ...req.tenantFilter };
 
     // Filter by customer
     if (customerId) filter.customer = customerId;
-
-    // Filter by status
+    // Filter by branch
+    if (branch) filter.branch = branch;
+    // Filter by payment status
     if (status) filter.status = status;
+    // Filter by source (e.g., 'portal')
+    if (source) filter.source = source;
+    // Filter by order tracking status
+    if (orderStatus) filter.orderStatus = orderStatus;
 
     // Filter by date range
     if (startDate || endDate) {
@@ -39,9 +44,11 @@ class InvoiceController {
       if (endDate) filter.createdAt.$lte = new Date(endDate);
     }
 
-    // Search by invoice number
+    // Search by invoice number or customer name
     if (search) {
-      filter.invoiceNumber = { $regex: search, $options: 'i' };
+      filter.$or = [
+        { invoiceNumber: { $regex: search, $options: 'i' } },
+      ];
     }
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -133,7 +140,7 @@ class InvoiceController {
       await customer.save();
 
       // In-app notification
-      NotificationService.onPaymentReceived(req.tenantId, invoice, amount, customer.name).catch(() => {});
+      NotificationService.onPaymentReceived(req.tenantId, invoice, amount, customer.name).catch(() => { });
 
       // WhatsApp payment confirmation (non-blocking) — respects customer preferences
       if (customer.whatsapp?.enabled && customer.whatsapp?.notifications?.payments !== false) {
@@ -143,7 +150,7 @@ class InvoiceController {
         if (whatsappPhone && tenant?.whatsapp) {
           WhatsAppService.sendPaymentReceivedTemplate(
             whatsappPhone, customer, amount, invoice.remainingAmount, invoice.invoiceNumber, tenant.whatsapp
-          ).catch(() => {});
+          ).catch(() => { });
         }
       }
     }
@@ -242,25 +249,25 @@ class InvoiceController {
     // We wrap this in try-catch internally if we want specific error handling,
     // but catchAsync will handle unexpected errors.
     // However, the original code had a specific 'success' response even on error.
-    
+
     try {
-        const tenant = await require('../models/Tenant').findById(req.tenantId);
-        const result = await WhatsAppService.sendInvoiceNotification(phone, invoice, invoice.customer, tenant?.whatsapp);
-  
-        if (result && !result.failed && !result.skipped) {
-          invoice.whatsappSent = true;
-          invoice.whatsappSentAt = new Date();
-          await invoice.save();
-          ApiResponse.success(res, null, 'تم إرسال الفاتورة عبر WhatsApp');
-        } else {
-          // WhatsApp failed but don't crash — inform user
-          ApiResponse.success(res, { whatsappStatus: 'failed', reason: result?.error || result?.reason || 'unknown' },
-            'تعذر الإرسال عبر WhatsApp — تحقق من اتصال الإنترنت أو إعدادات API');
-        }
+      const tenant = await require('../models/Tenant').findById(req.tenantId);
+      const result = await WhatsAppService.sendInvoiceNotification(phone, invoice, invoice.customer, tenant?.whatsapp);
+
+      if (result && !result.failed && !result.skipped) {
+        invoice.whatsappSent = true;
+        invoice.whatsappSentAt = new Date();
+        await invoice.save();
+        ApiResponse.success(res, null, 'تم إرسال الفاتورة عبر WhatsApp');
+      } else {
+        // WhatsApp failed but don't crash — inform user
+        ApiResponse.success(res, { whatsappStatus: 'failed', reason: result?.error || result?.reason || 'unknown' },
+          'تعذر الإرسال عبر WhatsApp — تحقق من اتصال الإنترنت أو إعدادات API');
+      }
     } catch (error) {
-         // Don't crash, just inform
-        ApiResponse.success(res, { whatsappStatus: 'error' },
-          'تعذر الإرسال — خطأ في اتصال WhatsApp');
+      // Don't crash, just inform
+      ApiResponse.success(res, { whatsappStatus: 'error' },
+        'تعذر الإرسال — خطأ في اتصال WhatsApp');
     }
   });
 
@@ -283,13 +290,56 @@ class InvoiceController {
     if (!phone || !message) return next(AppError.badRequest('رقم الهاتف والرسالة مطلوبين'));
 
     try {
-        const tenant = await require('../models/Tenant').findById(req.tenantId);
-        const result = await WhatsAppService.sendMessage(phone, message, tenant?.whatsapp);
-        ApiResponse.success(res, { success: result.success }, result.success ? 'تم إرسال الرسالة عبر WhatsApp' : 'فشل إرسال الرسالة');
+      const tenant = await require('../models/Tenant').findById(req.tenantId);
+      const result = await WhatsAppService.sendMessage(phone, message, tenant?.whatsapp);
+      ApiResponse.success(res, { success: result.success }, result.success ? 'تم إرسال الرسالة عبر WhatsApp' : 'فشل إرسال الرسالة');
     } catch (error) {
-        // Don't crash, just return failure
-        ApiResponse.success(res, { success: false }, 'تعذر الإرسال عبر WhatsApp');
+      // Don't crash, just return failure
+      ApiResponse.success(res, { success: false }, 'تعذر الإرسال عبر WhatsApp');
     }
+  });
+
+  /**
+   * PATCH /api/v1/invoices/:id/order-status
+   * Update portal order tracking status
+   */
+  updateOrderStatus = catchAsync(async (req, res, next) => {
+    const { orderStatus, note } = req.body;
+    const allowedStatuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'];
+
+    if (!orderStatus || !allowedStatuses.includes(orderStatus)) {
+      return next(AppError.badRequest('حالة الطلب غير صالحة'));
+    }
+
+    const invoice = await Invoice.findOne({ _id: req.params.id, ...req.tenantFilter });
+    if (!invoice) return next(AppError.notFound('الفاتورة غير موجودة'));
+
+    invoice.orderStatus = orderStatus;
+    invoice.orderStatusHistory = invoice.orderStatusHistory || [];
+    invoice.orderStatusHistory.push({
+      status: orderStatus,
+      date: new Date(),
+      note: note || `تم التحديث إلى: ${orderStatus}`,
+    });
+
+    await invoice.save({ validateBeforeSave: false });
+
+    // Notify customer
+    try {
+      const labels = { pending: 'قيد الانتظار', confirmed: 'مؤكد', processing: 'جاري التجهيز', shipped: 'تم الشحن', delivered: 'تم التسليم', cancelled: 'ملغي' };
+      const Notification = require('../models/Notification');
+      await Notification.create({
+        tenant: invoice.tenant,
+        customerRecipient: invoice.customer,
+        type: 'order',
+        title: `تحديث طلبك #${invoice.invoiceNumber}`,
+        message: `تم تحديث حالة طلبك إلى: ${labels[orderStatus] || orderStatus}`,
+        icon: 'package',
+        color: orderStatus === 'delivered' ? 'success' : orderStatus === 'cancelled' ? 'danger' : 'info',
+      });
+    } catch { /* ignore */ }
+
+    ApiResponse.success(res, { orderStatus }, 'تم تحديث حالة الطلب');
   });
 }
 

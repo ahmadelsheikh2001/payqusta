@@ -51,6 +51,31 @@ class PayQustaServer {
    */
   async _connectDatabase() {
     await connectDB();
+
+    // One-time Data Migration: Clear legacy whatsapp string fields
+    try {
+      const Customer = require('./src/models/Customer');
+      const Tenant = require('./src/models/Tenant');
+
+      // Clear whatsapp if it's a string in Customer
+      await Customer.updateMany(
+        { whatsapp: { $type: 'string' } },
+        [
+          { $set: { whatsappNumber: '$whatsapp' } },
+          { $unset: ['whatsapp'] }
+        ]
+      );
+
+      // Clear whatsapp if it's a string in Tenant
+      await Tenant.updateMany(
+        { whatsapp: { $type: 'string' } },
+        { $unset: { whatsapp: 1 } }
+      );
+
+      logger.info('✅ Data migration for WhatsApp fields completed');
+    } catch (err) {
+      logger.error(`❌ Data migration failed: ${err.message}`);
+    }
   }
 
   /**

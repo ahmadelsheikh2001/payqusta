@@ -25,7 +25,7 @@ const productSchema = new mongoose.Schema(
       trim: true,
       uppercase: true,
     },
-    description: { type: String, maxlength: 2000 },
+    description: { type: String, maxlength: 10000 },
     category: {
       type: String,
       required: [true, 'فئة المنتج مطلوبة'],
@@ -84,7 +84,7 @@ const productSchema = new mongoose.Schema(
     barcode: { type: String },
     tags: [{ type: String }],
     isActive: { type: Boolean, default: true },
-    
+
     // Product Variants (Size/Color)
     hasVariants: { type: Boolean, default: false },
     variants: [
@@ -109,7 +109,7 @@ const productSchema = new mongoose.Schema(
         isActive: { type: Boolean, default: true },
       },
     ],
-    
+
     // Stock alerts
     lowStockAlertSent: { type: Boolean, default: false },
     outOfStockAlertSent: { type: Boolean, default: false },
@@ -128,6 +128,7 @@ const productSchema = new mongoose.Schema(
 
 // Indexes
 productSchema.index({ tenant: 1, sku: 1 }, { unique: true, sparse: true });
+productSchema.index({ tenant: 1, barcode: 1 }, { unique: true, sparse: true });
 productSchema.index({ tenant: 1, name: 'text', description: 'text' });
 productSchema.index({ tenant: 1, category: 1 });
 productSchema.index({ tenant: 1, stockStatus: 1 });
@@ -146,6 +147,10 @@ productSchema.virtual('profitPerUnit').get(function () {
 
 // Pre-save: Update global stock from inventory and set status
 productSchema.pre('save', function (next) {
+  // Convert empty strings to undefined for sparse indexes
+  if (this.sku === '') this.sku = undefined;
+  if (this.barcode === '') this.barcode = undefined;
+
   // Sync Inventory -> Global Stock
   if (this.inventory && this.inventory.length > 0) {
     this.stock.quantity = this.inventory.reduce((sum, item) => sum + item.quantity, 0);
@@ -170,7 +175,7 @@ productSchema.pre('save', function (next) {
     this.lowStockAlertSent = false;
     this.outOfStockAlertSent = false;
   }
-  
+
   next();
 });
 
@@ -182,9 +187,9 @@ productSchema.post('findOneAndUpdate', async function (doc) {
   // or relying on the doc returned might be enough if we returned new: true
   // meaningful recalculation often requires a separate save or atomic update.
   // For simplicity, we'll just check the returned doc's quantity if it was updated successfully.
-  
+
   let newStatus = doc.stockStatus;
-  
+
   if (doc.stock.quantity <= 0) {
     newStatus = STOCK_STATUS.OUT_OF_STOCK;
   } else if (doc.stock.quantity <= doc.stock.minQuantity) {
@@ -233,13 +238,13 @@ productSchema.statics.getStockSummary = async function (tenantId, branchId = nul
   if (branchId) {
     // Branch specific aggregation
     const branchObjId = new mongoose.Types.ObjectId(branchId);
-    
+
     // Filter products that have this branch in inventory
     // matchStage['inventory.branch'] = branchObjId; // Optional: only count products that exist in this branch
 
     // Unwind inventory to filter by branch
     // We strictly want to count stock for this branch
-    
+
     const pipeline = [
       { $match: matchStage },
       { $unwind: '$inventory' },
@@ -270,9 +275,9 @@ productSchema.statics.getStockSummary = async function (tenantId, branchId = nul
         },
       },
     ];
-    
+
     const result = await this.aggregate(pipeline);
-    
+
     const summary = { inStock: 0, lowStock: 0, outOfStock: 0, totalValue: 0 };
     result.forEach((item) => {
       if (item._id === 'in_stock') { summary.inStock = item.count; summary.totalValue += item.totalValue; }

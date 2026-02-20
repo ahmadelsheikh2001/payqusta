@@ -66,7 +66,7 @@ const invoiceSchema = new mongoose.Schema(
     branch: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Branch',
-      required: true,
+      required: false, // optional for portal orders
       index: true,
     },
     invoiceNumber: {
@@ -82,7 +82,7 @@ const invoiceSchema = new mongoose.Schema(
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
+      required: false, // portal orders use customer as originator
     },
     // Items
     items: [invoiceItemSchema],
@@ -121,6 +121,17 @@ const invoiceSchema = new mongoose.Schema(
       enum: Object.values(INVOICE_STATUS),
       default: INVOICE_STATUS.PENDING,
     },
+    // Order tracking status (for portal orders)
+    orderStatus: {
+      type: String,
+      enum: ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'],
+      default: 'pending',
+    },
+    orderStatusHistory: [{
+      status: String,
+      date: { type: Date, default: Date.now },
+      note: String,
+    }],
     // WhatsApp
     whatsappSent: { type: Boolean, default: false },
     whatsappSentAt: { type: Date },
@@ -128,6 +139,21 @@ const invoiceSchema = new mongoose.Schema(
     notes: { type: String, maxlength: 2000 },
     // Due date (for deferred payment)
     dueDate: { type: Date },
+    // Source
+    source: {
+      type: String,
+      enum: ['pos', 'portal', 'online_store', 'import'],
+      default: 'pos',
+    },
+    // Shipping / Delivery details (portal orders)
+    shippingAddress: {
+      fullName: { type: String },
+      phone: { type: String },
+      address: { type: String },
+      city: { type: String },
+      governorate: { type: String },
+      notes: { type: String },
+    },
   },
   {
     timestamps: true,
@@ -143,13 +169,27 @@ invoiceSchema.index({ tenant: 1, customer: 1 });
 invoiceSchema.index({ tenant: 1, status: 1 });
 invoiceSchema.index({ tenant: 1, createdAt: -1 });
 invoiceSchema.index({ 'installments.dueDate': 1, 'installments.status': 1 });
+// Compound indexes for common queries
+invoiceSchema.index({ tenant: 1, customer: 1, status: 1 });
+invoiceSchema.index({ tenant: 1, branch: 1, createdAt: -1 });
+invoiceSchema.index({ tenant: 1, paymentMethod: 1, status: 1 });
 
 // Pre-save: Calculate totals and status
 invoiceSchema.pre('save', function (next) {
-  // Calculate subtotal from items
+  // Calculate subtotal and tax from items
   if (this.items && this.items.length > 0) {
     this.subtotal = this.items.reduce((sum, item) => sum + item.totalPrice, 0);
-    this.totalAmount = this.subtotal - this.discount;
+
+    // Calculate tax amount from taxable items
+    this.taxAmount = this.items.reduce((sum, item) => {
+      if (item.taxable && item.taxRate > 0) {
+        return sum + (item.totalPrice * (item.taxRate / 100));
+      }
+      return sum;
+    }, 0);
+
+    // Total = Subtotal + Tax - Discount
+    this.totalAmount = this.subtotal + this.taxAmount - this.discount;
   }
 
   // Calculate remaining amount

@@ -3,9 +3,10 @@ import { Plus, Search, Edit, Trash2, Package, Check, Truck, MessageCircle, Send,
 import toast from 'react-hot-toast';
 import { notify } from '../components/AnimatedNotification';
 import { productsApi, suppliersApi, api } from '../store';
-import { Button, Input, Select, Modal, Badge, Card, LoadingSpinner, EmptyState } from '../components/UI';
+import { Button, Input, Select, Modal, Badge, Card, LoadingSpinner, EmptyState, TextArea } from '../components/UI';
 import Pagination from '../components/Pagination';
 import BarcodeScanner from '../components/BarcodeScanner';
+import RichTextEditor from '../components/RichTextEditor';
 
 export default function ProductsPage() {
   const [products, setProducts] = useState([]);
@@ -33,6 +34,8 @@ export default function ProductsPage() {
   });
   const LIMIT = 12;
 
+  const [pendingImages, setPendingImages] = useState([]);
+
   // Load categories & suppliers once
   useEffect(() => {
     productsApi.getCategories().then((r) => setCategories(r.data.data || [])).catch(() => {});
@@ -56,8 +59,8 @@ export default function ProductsPage() {
   useEffect(() => { loadProducts(); }, [loadProducts]);
   useEffect(() => { setPage(1); }, [search, stockFilter, categoryFilter, supplierFilter]);
 
-  const openAdd = () => { setEditId(null); setProductImages([]); setForm({ name: '', sku: '', barcode: '', category: categories[0] || 'هواتف', price: '', cost: '', stockQuantity: '', minQuantity: '5', description: '', supplier: '', expiryDate: '' }); setShowModal(true); };
-  const openEdit = (p) => { setEditId(p._id); setProductImages(p.images || []); setForm({ name: p.name, sku: p.sku || '', barcode: p.barcode || '', category: p.category, price: String(p.price), cost: String(p.cost), stockQuantity: String(p.stock?.quantity || 0), minQuantity: String(p.stock?.minQuantity || 5), description: p.description || '', supplier: p.supplier?._id || p.supplier || '', expiryDate: p.expiryDate ? p.expiryDate.split('T')[0] : '' }); setShowModal(true); };
+  const openAdd = () => { setEditId(null); setProductImages([]); setPendingImages([]); setForm({ name: '', sku: '', barcode: '', category: categories[0] || 'هواتف', price: '', cost: '', stockQuantity: '', minQuantity: '5', description: '', supplier: '', expiryDate: '' }); setShowModal(true); };
+  const openEdit = (p) => { setEditId(p._id); setProductImages(p.images || []); setPendingImages([]); setForm({ name: p.name, sku: p.sku || '', barcode: p.barcode || '', category: p.category, price: String(p.price), cost: String(p.cost), stockQuantity: String(p.stock?.quantity || 0), minQuantity: String(p.stock?.minQuantity || 5), description: p.description || '', supplier: p.supplier?._id || p.supplier || '', expiryDate: p.expiryDate ? p.expiryDate.split('T')[0] : '' }); setShowModal(true); };
 
   const handleSave = async () => {
     if (!form.name || !form.price) return toast.error('الاسم والسعر مطلوبين');
@@ -65,9 +68,36 @@ export default function ProductsPage() {
     try {
       const data = { ...form };
       if (!data.supplier) delete data.supplier;
-      if (editId) { await productsApi.update(editId, data); toast.success('تم تحديث المنتج ✅'); }
-      else { await productsApi.create(data); toast.success('تم إضافة المنتج ✅'); }
-      setShowModal(false); loadProducts();
+      let createdId = editId;
+
+      if (editId) { 
+        await productsApi.update(editId, data); 
+        toast.success('تم تحديث المنتج ✅'); 
+      } else { 
+        const res = await productsApi.create(data); 
+        createdId = res.data.data._id;
+        toast.success('تم إضافة المنتج ✅'); 
+      }
+
+      // Upload pending images if any (only for new products or new images in edit mode if we supported it there too)
+      if (pendingImages.length > 0 && createdId) {
+        const loadToast = toast.loading('جاري رفع الصور...');
+        try {
+          const formData = new FormData();
+          for (let i = 0; i < pendingImages.length; i++) {
+            formData.append('images', pendingImages[i]);
+          }
+          formData.append('setAsThumbnail', (!editId || productImages.length === 0) ? 'true' : 'false');
+          await productsApi.uploadImage(createdId, formData);
+          toast.success('تم رفع الصور بنجاح', { id: loadToast });
+        } catch (err) {
+          toast.error('فشل رفع الصور', { id: loadToast });
+        }
+      }
+
+      setShowModal(false); 
+      setPendingImages([]);
+      loadProducts();
     } catch (err) { toast.error(err.response?.data?.message || 'حدث خطأ'); }
     finally { setSaving(false); }
   };
@@ -142,46 +172,63 @@ export default function ProductsPage() {
 
   // Upload image
   const handleImageUpload = async (e) => {
-    if (!editId) return toast.error('احفظ المنتج أولاً قبل رفع الصور');
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      return toast.error('الملف يجب أن يكون صورة');
+    // Validate files
+    for (let i = 0; i < files.length; i++) {
+      if (!files[i].type.startsWith('image/')) return toast.error('الملفات يجب أن تكون صور فقط');
+      if (files[i].size > 5 * 1024 * 1024) return toast.error('حجم الصورة يجب ألا يتجاوز 5MB');
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      return toast.error('حجم الصورة يجب ألا يتجاوز 5MB');
-    }
+    if (editId) {
+        setUploadingImage(true);
+        try {
+        const formData = new FormData();
+        // Append all files to 'images' field
+        for (let i = 0; i < files.length; i++) {
+            formData.append('images', files[i]);
+        }
+        formData.append('setAsThumbnail', productImages.length === 0 ? 'true' : 'false');
 
-    setUploadingImage(true);
-    try {
-      const formData = new FormData();
-      formData.append('image', file);
-      formData.append('setAsThumbnail', productImages.length === 0 ? 'true' : 'false');
-
-      const res = await productsApi.uploadImage(editId, formData);
-      setProductImages([...productImages, res.data.data.image]);
-      toast.success('تم رفع الصورة بنجاح ✅');
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'خطأ في رفع الصورة');
-    } finally {
-      setUploadingImage(false);
+        const res = await productsApi.uploadImage(editId, formData);
+        
+        // Update state with new images (backend returns { images: [...] })
+        const newImages = res.data.data.images || [res.data.data.image]; // Fallback for single
+        setProductImages([...productImages, ...newImages]);
+        
+        toast.success(`تم رفع ${files.length > 1 ? files.length + ' صور' : 'الصورة'} بنجاح ✅`);
+        } catch (err) {
+        toast.error(err.response?.data?.message || 'خطأ في رفع الصور');
+        } finally {
+        setUploadingImage(false);
+        e.target.value = '';
+        }
+    } else {
+        // Pending upload
+        setPendingImages([...pendingImages, ...Array.from(files)]);
+        toast.success(`تم اختيار ${files.length} صور (سيتم الرفع عند الحفظ)`);
+        e.target.value = '';
     }
   };
 
   // Delete image
   const handleDeleteImage = async (imageUrl) => {
-    if (!editId) return;
+    if (!editId) return; // Should not happen for pending images via this function
 
-    try {
-      await productsApi.deleteImage(editId, imageUrl);
-      setProductImages(productImages.filter(img => img !== imageUrl));
-      toast.success('تم حذف الصورة');
-    } catch (err) {
-      toast.error('خطأ في حذف الصورة');
+    if (confirm('هل أنت متأكد من حذف الصورة؟')) {
+        try {
+        await productsApi.deleteImage(editId, imageUrl);
+        setProductImages(productImages.filter(img => img !== imageUrl));
+        toast.success('تم حذف الصورة');
+        } catch (err) {
+        toast.error('خطأ في حذف الصورة');
+        }
     }
+  };
+
+  const removePendingImage = (index) => {
+    setPendingImages(pendingImages.filter((_, i) => i !== index));
   };
 
   const statusBadge = (s) => s === 'in_stock' ? <Badge variant="success">متوفر</Badge> : s === 'low_stock' ? <Badge variant="warning">منخفض ⚠️</Badge> : <Badge variant="danger">نفذ 🚨</Badge>;
@@ -424,6 +471,12 @@ export default function ProductsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input label="اسم المنتج *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="sm:col-span-2" />
           <Input label="كود SKU" value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
+          <RichTextEditor 
+            label="وصف المنتج" 
+            value={form.description} 
+            onChange={(content) => setForm({ ...form, description: content })} 
+            className="sm:col-span-2"
+          />
 
           {/* Barcode input with scanner and search */}
           <div className="relative">
@@ -489,74 +542,114 @@ export default function ProductsPage() {
           <Input label="سعر التكلفة *" type="number" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} />
           <Input label="الكمية بالمخزون" type="number" value={form.stockQuantity} onChange={(e) => setForm({ ...form, stockQuantity: e.target.value })} />
           <Input label="الحد الأدنى (تنبيه)" type="number" value={form.minQuantity} onChange={(e) => setForm({ ...form, minQuantity: e.target.value })} />
-          <Input label="تاريخ الانتهاء" type="date" value={form.expiryDate} onChange={(e) => setForm({ ...form, expiryDate: e.target.value })} />
+          <div className="flex flex-col gap-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input 
+                type="checkbox" 
+                checked={!!form.expiryDate} 
+                onChange={(e) => setForm({ ...form, expiryDate: e.target.checked ? new Date().toISOString().split('T')[0] : '' })}
+                className="w-4 h-4 rounded text-primary-600 focus:ring-primary-500" 
+              />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">للمنتج تاريخ صلاحية</span>
+            </label>
+            
+            {form.expiryDate && (
+              <Input 
+                type="date" 
+                value={form.expiryDate ? form.expiryDate.split('T')[0] : ''} 
+                onChange={(e) => setForm({ ...form, expiryDate: e.target.value })} 
+                className="animate-fade-in"
+              />
+            )}
+          </div>
         </div>
 
         {/* Product Images */}
-        {editId && (
-          <div className="mt-4">
-            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
-              صور المنتج
-            </label>
+        <div className="mt-4">
+          <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+            صور المنتج
+          </label>
 
-            {/* Image Upload Button */}
-            <label className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                disabled={uploadingImage}
-                className="hidden"
-              />
-              {uploadingImage ? (
-                <div className="w-5 h-5 border-2 border-primary-500/30 border-t-primary-500 rounded-full animate-spin" />
-              ) : (
-                <>
-                  <Upload className="w-5 h-5 text-gray-400" />
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
-                    رفع صورة (حد أقصى 5MB)
-                  </span>
-                </>
-              )}
-            </label>
+          {/* Image Upload Button */}
+          <label className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+            <input
+              type="file"
+              multiple
+              accept="image/*"
+              onChange={handleImageUpload}
+              disabled={uploadingImage}
+              className="hidden"
+            />
+            {uploadingImage ? (
+              <div className="w-5 h-5 border-2 border-primary-500/30 border-t-primary-500 rounded-full animate-spin" />
+            ) : (
+              <>
+                <Upload className="w-5 h-5 text-gray-400" />
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  {editId ? 'رفع صور (اختر أكثر من صورة)' : 'اختر صور (سيتم الرفع مع الحفظ)'}
+                </span>
+              </>
+            )}
+          </label>
 
-            {/* Images Grid */}
-            {productImages.length > 0 && (
-              <div className="grid grid-cols-3 gap-3 mt-3">
-                {productImages.map((img, idx) => (
-                  <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800">
-                    <img
-                      src={img}
-                      alt={`Product ${idx + 1}`}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23f3f4f6" width="100" height="100"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%239ca3af" font-size="14"%3ENo Image%3C/text%3E%3C/svg%3E';
-                      }}
-                    />
-                    {idx === 0 && (
-                      <div className="absolute top-2 left-2 px-2 py-1 rounded-md bg-primary-500 text-white text-xs font-bold">
-                        رئيسية
-                      </div>
-                    )}
-                    <button
-                      onClick={() => handleDeleteImage(img)}
-                      className="absolute top-2 right-2 p-1.5 rounded-lg bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
-                    >
-                      <XIcon className="w-4 h-4" />
-                    </button>
+          {/* Images Grid */}
+          {(productImages.length > 0 || pendingImages.length > 0) && (
+            <div className="grid grid-cols-3 gap-3 mt-3">
+              {/* Existing Images */}
+              {productImages.map((img, idx) => (
+                <div key={`exist-${idx}`} className="relative group aspect-square rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800">
+                  <img
+                    src={img}
+                    alt={`Product ${idx + 1}`}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23f3f4f6" width="100" height="100"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%239ca3af" font-size="14"%3ENo Image%3C/text%3E%3C/svg%3E';
+                    }}
+                  />
+                  {idx === 0 && (
+                    <div className="absolute top-2 left-2 px-2 py-1 rounded-md bg-primary-500 text-white text-xs font-bold">
+                      رئيسية
+                    </div>
+                  )}
+                  <button
+                    onClick={() => handleDeleteImage(img)}
+                    className="absolute top-2 right-2 p-1.5 rounded-lg bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                  >
+                    <XIcon className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+
+              {/* Pending Images */}
+              {pendingImages.map((file, idx) => (
+                <div key={`pending-${idx}`} className="relative group aspect-square rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800 opacity-80 border-2 border-dashed border-primary-300">
+                  <img
+                    src={URL.createObjectURL(file)}
+                    alt={`Pending ${idx + 1}`}
+                    className="w-full h-full object-cover"
+                    onLoad={(e) => URL.revokeObjectURL(e.target.src)} // Free memory
+                  />
+                  <div className="absolute bottom-2 left-2 px-2 py-1 rounded-md bg-amber-500 text-white text-[10px] font-bold">
+                    جديدة
                   </div>
-                ))}
-              </div>
-            )}
+                  <button
+                    onClick={() => removePendingImage(idx)}
+                    className="absolute top-2 right-2 p-1.5 rounded-lg bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                  >
+                    <XIcon className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
 
-            {productImages.length === 0 && (
-              <div className="text-center py-8 text-gray-400">
-                <ImageIcon className="w-12 h-12 mx-auto mb-2 opacity-30" />
-                <p className="text-sm">لا توجد صور</p>
-              </div>
-            )}
-          </div>
-        )}
+          {productImages.length === 0 && pendingImages.length === 0 && (
+            <div className="text-center py-8 text-gray-400">
+              <ImageIcon className="w-12 h-12 mx-auto mb-2 opacity-30" />
+              <p className="text-sm">لا توجد صور</p>
+            </div>
+          )}
+        </div>
 
         {!editId && (
           <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-500/10 rounded-xl text-sm text-blue-700 dark:text-blue-300">

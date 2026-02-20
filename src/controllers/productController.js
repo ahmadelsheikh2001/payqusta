@@ -80,6 +80,22 @@ class ProductController {
       },
     };
 
+    // Check for uniqueness manually
+    if (req.body.sku || req.body.barcode) {
+      const existing = await Product.findOne({
+        tenant: req.tenantId,
+        $or: [
+          ...(req.body.sku ? [{ sku: req.body.sku }, { 'variants.sku': req.body.sku }] : []),
+          ...(req.body.barcode ? [{ barcode: req.body.barcode }, { 'variants.barcode': req.body.barcode }] : []),
+        ],
+      });
+
+      if (existing) {
+        const field = (req.body.sku && (existing.sku === req.body.sku || existing.variants?.some(v => v.sku === req.body.sku))) ? 'كود SKU' : 'الباركود';
+        return next(new AppError(`${field} مستخدم بالفعل لمُنتج آخر في هذا المتجر`, 409));
+      }
+    }
+
     const product = await Product.create(productData);
 
     ApiResponse.created(res, product, 'تم إضافة المنتج بنجاح');
@@ -112,8 +128,24 @@ class ProductController {
     if (req.body.minQuantity !== undefined) product.stock.minQuantity = req.body.minQuantity;
 
     // Update auto-restock
-    if (req.body.autoRestock !== undefined) {
-      product.autoRestock = req.body.autoRestock;
+    // Check for uniqueness if SKU or Barcode is changing
+    const newSku = req.body.sku;
+    const newBarcode = req.body.barcode;
+
+    if ((newSku && newSku !== product.sku) || (newBarcode && newBarcode !== product.barcode)) {
+      const existing = await Product.findOne({
+        tenant: req.tenantId,
+        _id: { $ne: product._id },
+        $or: [
+          ...(newSku ? [{ sku: newSku }, { 'variants.sku': newSku }] : []),
+          ...(newBarcode ? [{ barcode: newBarcode }, { 'variants.barcode': newBarcode }] : []),
+        ],
+      });
+
+      if (existing) {
+        const field = (newSku && (existing.sku === newSku || existing.variants?.some(v => v.sku === newSku))) ? 'كود SKU' : 'الباركود';
+        return next(new AppError(`${field} مستخدم بالفعل لمُنتج آخر في هذا المتجر`, 409));
+      }
     }
 
     await product.save();
@@ -361,24 +393,33 @@ class ProductController {
 
     if (!product) return next(AppError.notFound('المنتج غير موجود'));
 
-    if (!req.file) return next(AppError.badRequest('الصورة مطلوبة'));
+    // Handle both single file (req.file) and multiple files (req.files)
+    const files = req.files || (req.file ? [req.file] : []);
 
-    // Process and save image
+    if (!files || files.length === 0) return next(AppError.badRequest('الصورة مطلوبة'));
+
     const { processImage } = require('../middleware/upload');
-    const filename = `product-${product._id}-${Date.now()}.webp`;
-    const imagePath = await processImage(req.file.buffer, filename, 'products');
+    const uploadedImages = [];
 
-    // Add to product images array (if not thumbnail)
-    if (req.body.setAsThumbnail === 'true' || !product.thumbnail) {
-      product.thumbnail = imagePath;
+    // Process all files
+    for (const file of files) {
+      const filename = `product-${product._id}-${Date.now()}-${Math.round(Math.random() * 1000)}.webp`;
+      const imagePath = await processImage(file.buffer, filename, 'products');
+      uploadedImages.push(imagePath);
     }
 
+    // Add to product images array
     if (!product.images) product.images = [];
-    product.images.push(imagePath);
+    product.images.push(...uploadedImages);
+
+    // Set thumbnail if not set or requested
+    if (req.body.setAsThumbnail === 'true' || !product.thumbnail) {
+      product.thumbnail = uploadedImages[0];
+    }
 
     await product.save();
 
-    ApiResponse.success(res, { image: imagePath, product }, 'تم رفع الصورة بنجاح');
+    ApiResponse.success(res, { images: uploadedImages, product }, 'تم رفع الصور بنجاح');
   });
 
   /**

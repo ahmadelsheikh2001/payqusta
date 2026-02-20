@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { usePortalStore } from '../store/portalStore';
 import { useThemeStore } from '../store';
-import { Receipt, Eye, X, Calendar, CreditCard, Clock, CheckCircle, AlertTriangle, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
+import { Receipt, Eye, X, Calendar, CreditCard, Clock, CheckCircle, AlertTriangle, ChevronLeft, ChevronRight, Filter, Download, RefreshCcw } from 'lucide-react';
+import { notify } from '../components/AnimatedNotification';
+
 
 const statusConfig = {
   paid: { label: 'مدفوعة', color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', icon: CheckCircle },
@@ -11,7 +13,8 @@ const statusConfig = {
 };
 
 export default function PortalInvoices() {
-  const { fetchInvoices, fetchInvoiceDetails } = usePortalStore();
+  const { fetchInvoices, fetchInvoiceDetails, downloadInvoicePDF, createReturnRequest } = usePortalStore();
+
   const { dark } = useThemeStore();
   const [invoices, setInvoices] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
@@ -19,6 +22,13 @@ export default function PortalInvoices() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
+
+  // Return Request State
+  const [returnItem, setReturnItem] = useState(null);
+  const [returnReason, setReturnReason] = useState('defective');
+  const [returnQuantity, setReturnQuantity] = useState(1);
+  const [returnDesc, setReturnDesc] = useState('');
+  const [returnLoading, setReturnLoading] = useState(false);
 
   useEffect(() => {
     loadInvoices(1, statusFilter);
@@ -66,11 +76,10 @@ export default function PortalInvoices() {
           <button
             key={f.value}
             onClick={() => setStatusFilter(f.value)}
-            className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all ${
-              statusFilter === f.value
-                ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/30'
-                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700'
-            }`}
+            className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all ${statusFilter === f.value
+              ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/30'
+              : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700'
+              }`}
           >
             {f.label}
           </button>
@@ -182,9 +191,21 @@ export default function PortalInvoices() {
                   <h3 className="font-bold text-lg text-gray-900 dark:text-white">
                     فاتورة #{selectedInvoice.invoiceNumber}
                   </h3>
-                  <button onClick={() => setSelectedInvoice(null)} className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800">
-                    <X className="w-5 h-5 text-gray-500" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={async () => {
+                        const res = await downloadInvoicePDF(selectedInvoice._id);
+                        if (!res.success) notify.error('فشل تحميل الفاتورة');
+                      }}
+                      className="p-2 rounded-xl bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 hover:bg-green-200 transition flex items-center gap-1 text-xs font-bold"
+                    >
+                      <Download className="w-4 h-4" />
+                      PDF
+                    </button>
+                    <button onClick={() => setSelectedInvoice(null)} className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800">
+                      <X className="w-5 h-5 text-gray-500" />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="p-4 space-y-4">
@@ -235,7 +256,21 @@ export default function PortalInvoices() {
                               <td className="p-3 font-medium text-gray-900 dark:text-white">{item.productName || item.product?.name || '-'}</td>
                               <td className="p-3 text-center text-gray-600 dark:text-gray-400">{item.quantity}</td>
                               <td className="p-3 text-center text-gray-600 dark:text-gray-400">{item.price?.toLocaleString()}</td>
-                              <td className="p-3 text-left font-bold text-gray-900 dark:text-white">{item.total?.toLocaleString()}</td>
+                              <td className="p-3 text-left font-bold text-gray-900 dark:text-white flex items-center justify-between gap-2">
+                                <span>{item.total?.toLocaleString()}</span>
+                                <button
+                                  onClick={() => {
+                                    setReturnItem({ ...item, invoiceId: selectedInvoice._id });
+                                    setReturnQuantity(1);
+                                    setReturnReason('defective');
+                                    setReturnDesc('');
+                                  }}
+                                  className="p-1.5 text-gray-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg transition"
+                                  title="طلب إرجاع"
+                                >
+                                  <RefreshCcw className="w-4 h-4" />
+                                </button>
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -260,13 +295,12 @@ export default function PortalInvoices() {
                         {selectedInvoice.installments.map((inst, idx) => (
                           <div
                             key={idx}
-                            className={`flex justify-between items-center p-3 rounded-xl border ${
-                              inst.status === 'paid'
-                                ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800'
-                                : inst.status === 'overdue'
+                            className={`flex justify-between items-center p-3 rounded-xl border ${inst.status === 'paid'
+                              ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800'
+                              : inst.status === 'overdue'
                                 ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800'
                                 : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
-                            }`}
+                              }`}
                           >
                             <div>
                               <p className="font-bold text-sm text-gray-900 dark:text-white">قسط {idx + 1}</p>
@@ -276,13 +310,12 @@ export default function PortalInvoices() {
                             </div>
                             <div className="text-left">
                               <p className="font-bold text-sm text-gray-900 dark:text-white">{inst.amount?.toLocaleString()} ج.م</p>
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                inst.status === 'paid'
-                                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                  : inst.status === 'overdue'
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${inst.status === 'paid'
+                                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                : inst.status === 'overdue'
                                   ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
                                   : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
-                              }`}>
+                                }`}>
                                 {inst.status === 'paid' ? 'مدفوع' : inst.status === 'overdue' ? 'متأخر' : 'قادم'}
                               </span>
                             </div>
@@ -302,6 +335,98 @@ export default function PortalInvoices() {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Return Request Modal */}
+      {returnItem && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-900 w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
+              <h3 className="font-bold text-lg text-gray-900 dark:text-white flex items-center gap-2">
+                <RefreshCcw className="w-5 h-5 text-primary-500" />
+                طلب إرجاع منتج
+              </h3>
+              <button
+                onClick={() => setReturnItem(null)}
+                disabled={returnLoading}
+                className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3">
+                <p className="font-bold text-gray-900 dark:text-white text-sm">{returnItem.productName || returnItem.product?.name}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">الكمية المشتراة: {returnItem.quantity}</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">الكمية المراد إرجاعها</label>
+                <input
+                  type="number"
+                  min="1"
+                  max={returnItem.quantity}
+                  value={returnQuantity}
+                  onChange={(e) => setReturnQuantity(Math.min(parseInt(e.target.value) || 1, returnItem.quantity))}
+                  className="w-full px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:border-primary-500 focus:outline-none transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">سبب الإرجاع</label>
+                <select
+                  value={returnReason}
+                  onChange={(e) => setReturnReason(e.target.value)}
+                  className="w-full px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:border-primary-500 focus:outline-none transition"
+                >
+                  <option value="defective">عيوب صناعة</option>
+                  <option value="wrong_item">منتج خاطئ</option>
+                  <option value="changed_mind">غيرت رأيي</option>
+                  <option value="other">أخرى</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">ملاحظات إضافية</label>
+                <textarea
+                  rows="2"
+                  value={returnDesc}
+                  onChange={(e) => setReturnDesc(e.target.value)}
+                  placeholder="اشرح المشكلة بالتفصيل..."
+                  className="w-full px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:border-primary-500 focus:outline-none transition resize-none"
+                />
+              </div>
+
+              <div className="pt-2">
+                <button
+                  onClick={async () => {
+                    setReturnLoading(true);
+                    const res = await createReturnRequest({
+                      invoiceId: returnItem.invoiceId,
+                      productId: returnItem.product._id || returnItem.product,
+                      quantity: returnQuantity,
+                      reason: returnReason,
+                      description: returnDesc
+                    });
+
+                    if (res.success) {
+                      notify.success('تم إرسال طلب الإرجاع بنجاح');
+                      setReturnItem(null);
+                    } else {
+                      notify.error(res.message);
+                    }
+                    setReturnLoading(false);
+                  }}
+                  disabled={returnLoading}
+                  className="w-full py-3 bg-primary-500 text-white rounded-xl font-bold hover:bg-primary-600 transition shadow-lg shadow-primary-500/20 disabled:opacity-50"
+                >
+                  {returnLoading ? 'جاري الإرسال...' : 'تأكيد طلب الإرجاع'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

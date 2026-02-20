@@ -137,8 +137,13 @@ const tenantSchema = new mongoose.Schema(
 tenantSchema.index({ owner: 1 });
 tenantSchema.index({ 'subscription.status': 1 });
 
-// Pre-save: generate slug
+// Pre-save Migration: Handle legacy whatsapp string
 tenantSchema.pre('save', function (next) {
+  if (typeof this.whatsapp === 'string') {
+    this.whatsapp = undefined;
+  }
+
+  // Generate slug
   if (this.isModified('name') && !this.slug) {
     this.slug = this.name
       .toLowerCase()

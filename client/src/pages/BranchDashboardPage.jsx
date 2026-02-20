@@ -22,28 +22,38 @@ export default function BranchDashboardPage() {
     const fetchStats = async () => {
       try {
         // Refresh user profile to get latest XP/Badges
-        getMe(); 
-        
-        // Fetch branch-specific quick stats
-        // Using existing endpoints or mock for now as backend might need specific endpoint
-        const [recentInvRes, shiftRes] = await Promise.all([
-          api.get('/invoices', { params: { limit: 5 } }),
-          api.get('/cash-shifts/current').catch(() => ({ data: { data: null } }))
-        ]);
+        await getMe();
+
+        // Get branch stats from new endpoint
+        if (!user?.branch?._id) {
+          setLoading(false);
+          return;
+        }
+
+        const statsRes = await api.get(`/branches/${user.branch._id}/stats`);
+        const statsData = statsRes.data.data;
 
         setStats({
-          recentInvoices: recentInvRes.data.data || [],
-          activeShift: shiftRes.data.data, 
-          todaySales: 0 
+          today: statsData.today,
+          currentShift: statsData.currentShift,
+          recentInvoices: statsData.recentInvoices || [],
+          gamification: statsData.gamification
         });
       } catch (err) {
-        console.error(err);
+        console.error('Error fetching branch stats:', err);
+        // Fallback to empty state
+        setStats({
+          today: { sales: 0, paid: 0, invoicesCount: 0, expenses: 0, profit: 0 },
+          currentShift: null,
+          recentInvoices: [],
+          gamification: null
+        });
       } finally {
         setLoading(false);
       }
     };
     fetchStats();
-  }, []);
+  }, [user]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex">
@@ -99,12 +109,12 @@ export default function BranchDashboardPage() {
                     </h3>
                     <div className="flex items-end gap-2 mb-1">
                       <span className="text-4xl font-black">
-                        {stats?.activeShift ? Math.round((stats.activeShift.currentSales / (user?.gamification?.dailyTarget || 1000)) * 100) : 0}%
+                        {stats?.gamification ? stats.gamification.progress : 0}%
                       </span>
                       <span className="text-indigo-200 mb-1">من الهدف اليومي</span>
                     </div>
                     <p className="text-sm text-indigo-100 opacity-80">
-                      حققت {stats?.activeShift?.currentSales?.toLocaleString() || 0} من {user?.gamification?.dailyTarget?.toLocaleString() || 1000} ج.م
+                      حققت {stats?.gamification?.currentSales?.toLocaleString() || stats?.today?.paid?.toLocaleString() || 0} من {stats?.gamification?.dailyTarget?.toLocaleString() || 10000} ج.م
                     </p>
                   </div>
                   
@@ -116,9 +126,9 @@ export default function BranchDashboardPage() {
                 
                 {/* Progress Bar */}
                 <div className="mt-4 w-full bg-black/20 rounded-full h-3 overflow-hidden">
-                  <div 
+                  <div
                     className="bg-white h-full rounded-full transition-all duration-1000 ease-out"
-                    style={{ width: `${Math.min(100, ((stats?.activeShift?.currentSales || 0) / (user?.gamification?.dailyTarget || 1000)) * 100)}%` }}
+                    style={{ width: `${Math.min(100, stats?.gamification?.progress || 0)}%` }}
                   />
                 </div>
               </div>
@@ -127,18 +137,18 @@ export default function BranchDashboardPage() {
               <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden">
                  <div className="text-center">
                    <div className="w-16 h-16 mx-auto bg-amber-100 dark:bg-amber-900/20 rounded-full flex items-center justify-center text-amber-500 font-black text-2xl mb-2 border-4 border-amber-50 dark:border-amber-900/40">
-                     {user?.gamification?.level || 1}
+                     {stats?.gamification?.level || user?.gamification?.level || 1}
                    </div>
                    <h3 className="font-bold text-gray-800 dark:text-gray-100">بائع نشيط</h3>
                    <p className="text-xs text-gray-400 mb-3">المستوى الحالي</p>
-                   
+
                    <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2 mb-1">
-                     <div 
-                       className="bg-amber-500 h-full rounded-full"
-                       style={{ width: '60%' }} // Mock for visual, need real XP calc for next level
+                     <div
+                       className="bg-amber-500 h-full rounded-full transition-all duration-1000 ease-out"
+                       style={{ width: `${Math.min(100, ((stats?.gamification?.points || user?.gamification?.points || 0) % 1000) / 10)}%` }}
                      />
                    </div>
-                   <p className="text-[10px] text-gray-400">{user?.gamification?.points || 0} XP نقطة خبرة</p>
+                   <p className="text-[10px] text-gray-400">{stats?.gamification?.points || user?.gamification?.points || 0} XP نقطة خبرة</p>
                  </div>
               </div>
             </div>

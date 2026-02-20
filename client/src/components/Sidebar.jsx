@@ -6,6 +6,7 @@ import {
   AlertTriangle, ChevronDown, ChevronLeft, Boxes, Clock,
   PieChart, TrendingUp, Crown, Building2, Shield, Activity,
   Upload, Database, Archive, DollarSign, ShoppingCart, Video,
+  ShoppingBag, RefreshCcw, MessageCircle, FileCheck,
 } from 'lucide-react';
 import { useAuthStore } from '../store';
 
@@ -13,7 +14,7 @@ export default function Sidebar({ open, onClose }) {
   const { user, tenant, logout } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
-  
+
   // Dropdown states
   const [adminOpen, setAdminOpen] = useState(
     location.pathname.startsWith('/admin')
@@ -44,10 +45,9 @@ export default function Sidebar({ open, onClose }) {
       to={to}
       end={end}
       className={({ isActive }) =>
-        `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
-          isActive
-            ? 'bg-primary-50 dark:bg-primary-500/10 text-primary-600 dark:text-primary-400 shadow-sm'
-            : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50 hover:text-gray-700 dark:hover:text-gray-300'
+        `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${isActive
+          ? 'bg-primary-50 dark:bg-primary-500/10 text-primary-600 dark:text-primary-400 shadow-sm'
+          : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50 hover:text-gray-700 dark:hover:text-gray-300'
         }`
       }
     >
@@ -65,10 +65,9 @@ export default function Sidebar({ open, onClose }) {
     <NavLink
       to={to}
       className={({ isActive }) =>
-        `flex items-center gap-3 px-4 py-2.5 pr-12 rounded-lg text-sm font-medium transition-all duration-200 ${
-          isActive
-            ? 'bg-primary-50 dark:bg-primary-500/10 text-primary-600 dark:text-primary-400'
-            : 'text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800/50 hover:text-gray-600 dark:hover:text-gray-300'
+        `flex items-center gap-3 px-4 py-2.5 pr-12 rounded-lg text-sm font-medium transition-all duration-200 ${isActive
+          ? 'bg-primary-50 dark:bg-primary-500/10 text-primary-600 dark:text-primary-400'
+          : 'text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800/50 hover:text-gray-600 dark:hover:text-gray-300'
         }`
       }
     >
@@ -80,11 +79,10 @@ export default function Sidebar({ open, onClose }) {
   const DropdownButton = ({ isOpen, isActive, onClick, icon: Icon, label }) => (
     <button
       onClick={onClick}
-      className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
-        isActive
+      className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${isActive
           ? 'bg-primary-50 dark:bg-primary-500/10 text-primary-600 dark:text-primary-400 shadow-sm'
           : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50 hover:text-gray-700 dark:hover:text-gray-300'
-      }`}
+        }`}
     >
       <div className="flex items-center gap-3">
         <Icon className="w-5 h-5 flex-shrink-0" />
@@ -137,27 +135,27 @@ export default function Sidebar({ open, onClose }) {
                 <span>الإدارة</span>
               </div>
             </div>
-            
+
             <NavItem to="/admin/users" icon={Shield} label="الموظفين" />
             <NavItem to="/roles" icon={Shield} label="الصلاحيات والأدوار" />
             <NavItem to="/admin/audit-logs" icon={Activity} label="سجل النشاطات" />
-            
+
             <div className="my-3 border-t border-gray-200 dark:border-gray-700" />
           </>
         )}
 
         {/* Staff Tools - Cash Drawer (Shift Management) */}
         {!user?.isSuperAdmin && (
-           <NavItem to="/cash-drawer" icon={DollarSign} label="إدارة الخزينة (الوردية)" />
+          <NavItem to="/cash-drawer" icon={DollarSign} label="إدارة الخزينة (الوردية)" />
         )}
 
         <NavItem to="/" icon={LayoutDashboard} label="لوحة التحكم" end />
         <NavItem to="/quick-sale" icon={Zap} label="بيع سريع ⚡" />
         <NavItem to="/command-center" icon={Target} label="مركز القيادة" />
-        
+
         {/* Products Dropdown */}
         <div>
-          <DropdownButton 
+          <DropdownButton
             isOpen={productsOpen}
             isActive={isProductsActive}
             onClick={() => setProductsOpen(!productsOpen)}
@@ -175,12 +173,20 @@ export default function Sidebar({ open, onClose }) {
 
         <NavItem to="/customers" icon={Users} label="العملاء" />
         <NavItem to="/invoices" icon={FileText} label="الفواتير" />
+        <NavItem to="/portal-orders" icon={ShoppingBag} label="طلبات البوابة" />
+        {(user?.role === 'admin' || user?.role === 'vendor') && (
+          <>
+            <NavItem to="/returns-management" icon={RefreshCcw} label="المرتجعات" />
+            <NavItem to="/kyc-review" icon={FileCheck} label="مستندات العملاء" />
+            <NavItem to="/support-messages" icon={MessageCircle} label="رسائل الدعم" />
+          </>
+        )}
         <NavItem to="/suppliers" icon={Truck} label="الموردين" />
         <NavItem to="/expenses" icon={Receipt} label="المصروفات" />
-        
+
         {/* Reports Dropdown */}
         <div>
-          <DropdownButton 
+          <DropdownButton
             isOpen={reportsOpen}
             isActive={isReportsActive}
             onClick={() => setReportsOpen(!reportsOpen)}
@@ -221,12 +227,12 @@ export default function Sidebar({ open, onClose }) {
         {(user?.role === 'admin' || user?.isSuperAdmin) && (
           <NavItem to="/branches" icon={Building2} label="الفروع" />
         )}
-        
+
         {/* Cameras - Only for Admin/Super Admin */}
         {(user?.role === 'admin' || user?.isSuperAdmin) && (
           <NavItem to="/cameras" icon={Video} label="المراقبة الحية" />
         )}
-        
+
         <NavItem to="/settings" icon={Settings} label="الإعدادات" />
       </nav>
 

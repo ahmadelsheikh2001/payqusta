@@ -40,6 +40,10 @@ import BackupRestorePage from './pages/BackupRestorePage';
 import BranchManagement from './pages/BranchManagement';
 import SuperAdminDashboard from './pages/SuperAdminDashboard';
 import TenantManagementPage from './pages/TenantManagementPage';
+import PortalOrdersAdminPage from './pages/PortalOrdersAdminPage';
+import ReturnsManagementPage from './pages/ReturnsManagementPage';
+import KYCReviewPage from './pages/KYCReviewPage';
+import SupportMessagesPage from './pages/SupportMessagesPage';
 
 // Storefront Pages
 import StorefrontLayout from './storefront/StorefrontLayout';
@@ -55,8 +59,18 @@ import PortalLogin from './portal/PortalLogin';
 import PortalLayout from './portal/PortalLayout';
 import PortalHome from './portal/PortalHome';
 import PortalInvoices from './portal/PortalInvoices';
+import PortalReturns from './portal/PortalReturns';
 import PortalStatement from './portal/PortalStatement';
 import PortalProfile from './portal/PortalProfile';
+import PortalDocuments from './portal/PortalDocuments';
+import PortalAddresses from './portal/PortalAddresses';
+import PortalInstallmentCalculator from './portal/PortalInstallmentCalculator';
+import PortalOrders from './portal/PortalOrders';
+import PortalWishlist from './portal/PortalWishlist';
+import PortalSupport from './portal/PortalSupport';
+import PortalNotifications from './portal/PortalNotifications';
+import PortalCheckout from './portal/PortalCheckout';
+import PortalPointsHistory from './portal/PortalPointsHistory';
 
 
 // Protected Route wrapper
@@ -94,7 +108,7 @@ function MainLayout() {
   useEffect(() => {
     setSidebarOpen(false);
   }, [location.pathname]);
-  
+
   // Dashboard Component (Original)
   const DashboardComponent = DashboardPage;
 
@@ -107,59 +121,63 @@ function MainLayout() {
         {/* Main Content */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <Header onMenuClick={() => setSidebarOpen(true)} />
-          
+
           <main className="flex-1 overflow-y-auto p-4 md:p-6">
             <ErrorBoundary>
-            <Routes>
-              {/* Admin Routes - Protected */}
-              <Route path="/admin/dashboard" element={<AdminRoute><AdminDashboardPage /></AdminRoute>} />
-              <Route path="/admin/statistics" element={<AdminRoute><AdminStatisticsPage /></AdminRoute>} />
-              <Route path="/admin/import" element={<AdminRoute><ImportDataPage /></AdminRoute>} />
-              <Route path="/admin/backup" element={<AdminRoute><BackupRestorePage /></AdminRoute>} />
+              <Routes>
+                {/* Admin Routes - Protected */}
+                <Route path="/admin/dashboard" element={<AdminRoute><AdminDashboardPage /></AdminRoute>} />
+                <Route path="/admin/statistics" element={<AdminRoute><AdminStatisticsPage /></AdminRoute>} />
+                <Route path="/admin/import" element={<AdminRoute><ImportDataPage /></AdminRoute>} />
+                <Route path="/admin/backup" element={<AdminRoute><BackupRestorePage /></AdminRoute>} />
 
-              {/* Storefront Routes (Public) */}
-              <Route path="/store" element={<StorefrontLayout><StorefrontHome /></StorefrontLayout>} />
-              <Route path="/store/products" element={<StorefrontLayout><ProductCatalog /></StorefrontLayout>} />
-              <Route path="/store/products/:id" element={<StorefrontLayout><ProductDetails /></StorefrontLayout>} />
-              <Route path="/store/cart" element={<StorefrontLayout><ShoppingCart /></StorefrontLayout>} />
-              <Route path="/store/checkout" element={<StorefrontLayout><Checkout /></StorefrontLayout>} />
-              <Route path="/store/order/:id" element={<StorefrontLayout><OrderConfirmation /></StorefrontLayout>} />
-              <Route path="/admin/tenants" element={<AdminRoute><AdminTenantsPage /></AdminRoute>} />
-              <Route path="/admin/users" element={<AdminRoute><AdminUsersPage /></AdminRoute>} />
-              <Route path="/admin/audit-logs" element={<AdminRoute><AdminAuditLogsPage /></AdminRoute>} />
+                {/* Storefront Routes (Public) */}
+                <Route path="/store" element={<StorefrontLayout><StorefrontHome /></StorefrontLayout>} />
+                <Route path="/store/products" element={<StorefrontLayout><ProductCatalog /></StorefrontLayout>} />
+                <Route path="/store/products/:id" element={<StorefrontLayout><ProductDetails /></StorefrontLayout>} />
+                <Route path="/store/cart" element={<StorefrontLayout><ShoppingCart /></StorefrontLayout>} />
+                <Route path="/store/checkout" element={<StorefrontLayout><Checkout /></StorefrontLayout>} />
+                <Route path="/store/order/:id" element={<StorefrontLayout><OrderConfirmation /></StorefrontLayout>} />
+                <Route path="/admin/tenants" element={<AdminRoute><AdminTenantsPage /></AdminRoute>} />
+                <Route path="/admin/users" element={<AdminRoute><AdminUsersPage /></AdminRoute>} />
+                <Route path="/admin/audit-logs" element={<AdminRoute><AdminAuditLogsPage /></AdminRoute>} />
 
-              {/* Regular Routes */}
-              <Route path="/" element={<DashboardPage />} />
-              <Route path="/quick-sale" element={<QuickSalePage />} />
-              <Route path="/command-center" element={<CommandCenterPage />} />
-              <Route path="/products" element={<ProductsPage />} />
-              <Route path="/stock-adjustments" element={<StockAdjustmentsPage />} />
-              <Route path="/low-stock" element={<LowStockPage />} />
-              <Route path="/customers" element={<CustomersPage />} />
-              <Route path="/invoices" element={<InvoicesPage />} />
-              <Route path="/suppliers" element={<SuppliersPage />} />
-              <Route path="/expenses" element={<ExpensesPage />} />
-              <Route path="/reports" element={<ReportsPage />} />
-              <Route path="/business-reports" element={<BusinessReportsPage />} />
-              <Route path="/aging-report" element={<AgingReportPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/cameras" element={<CamerasPage />} />
-              <Route path="/branches" element={<BranchManagement />} />
-              {/* Super Admin Routes */}
-              {user?.isSuperAdmin && (
-                <>
-                  <Route path="/super-admin" element={<SuperAdminDashboard />} />
-                  <Route path="/tenant-management" element={<TenantManagementPage />} />
-                </>
-              )}
-              <Route path="/cash-drawer" element={<CashDrawerPage />} />
-              <Route path="/roles" element={<RolesPage />} />
-              <Route path="/activity-logs" element={<ActivityLogsPage />} />
-              <Route path="/purchase-orders" element={<PurchaseOrdersPage />} />
-              <Route path="/import" element={<ImportDataPage />} />
-              <Route path="/backup" element={<BackupRestorePage />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
+                {/* Regular Routes */}
+                <Route path="/" element={<DashboardPage />} />
+                <Route path="/quick-sale" element={<QuickSalePage />} />
+                <Route path="/command-center" element={<CommandCenterPage />} />
+                <Route path="/products" element={<ProductsPage />} />
+                <Route path="/stock-adjustments" element={<StockAdjustmentsPage />} />
+                <Route path="/low-stock" element={<LowStockPage />} />
+                <Route path="/customers" element={<CustomersPage />} />
+                <Route path="/invoices" element={<InvoicesPage />} />
+                <Route path="/suppliers" element={<SuppliersPage />} />
+                <Route path="/expenses" element={<ExpensesPage />} />
+                <Route path="/reports" element={<ReportsPage />} />
+                <Route path="/business-reports" element={<BusinessReportsPage />} />
+                <Route path="/aging-report" element={<AgingReportPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/cameras" element={<CamerasPage />} />
+                <Route path="/branches" element={<BranchManagement />} />
+                {/* Super Admin Routes */}
+                {user?.isSuperAdmin && (
+                  <>
+                    <Route path="/super-admin" element={<SuperAdminDashboard />} />
+                    <Route path="/tenant-management" element={<TenantManagementPage />} />
+                  </>
+                )}
+                <Route path="/cash-drawer" element={<CashDrawerPage />} />
+                <Route path="/roles" element={<RolesPage />} />
+                <Route path="/activity-logs" element={<ActivityLogsPage />} />
+                <Route path="/purchase-orders" element={<PurchaseOrdersPage />} />
+                <Route path="/import" element={<ImportDataPage />} />
+                <Route path="/backup" element={<BackupRestorePage />} />
+                <Route path="/portal-orders" element={<PortalOrdersAdminPage />} />
+                <Route path="/returns-management" element={<ReturnsManagementPage />} />
+                <Route path="/kyc-review" element={<KYCReviewPage />} />
+                <Route path="/support-messages" element={<SupportMessagesPage />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
             </ErrorBoundary>
           </main>
         </div>
@@ -175,7 +193,7 @@ export default function App() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      getMe().catch(() => {});
+      getMe().catch(() => { });
     }
   }, []);
 
@@ -201,10 +219,10 @@ export default function App() {
             },
           }}
         />
-        
+
         {/* PWA Install Prompt */}
         <InstallPrompt />
-        
+
         <Routes>
           {/* Customer Portal Routes */}
           <Route path="/portal/login" element={
@@ -213,17 +231,26 @@ export default function App() {
             */
             <PortalLogin />
           } />
-          
+
           <Route path="/portal" element={<PortalLayout />}>
-             <Route index element={<Navigate to="dashboard" replace />} />
-             <Route path="dashboard" element={<PortalHome />} />
-             <Route path="invoices" element={<PortalInvoices />} />
-             <Route path="statement" element={<PortalStatement />} />
-             <Route path="profile" element={<PortalProfile />} />
-             <Route path="products" element={<ProductCatalog />} />
-             <Route path="products/:id" element={<ProductDetails />} />
-             <Route path="cart" element={<ShoppingCart />} />
-             <Route path="checkout" element={<Checkout />} />
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={<PortalHome />} />
+            <Route path="invoices" element={<PortalInvoices />} />
+            <Route path="returns" element={<PortalReturns />} />
+            <Route path="statement" element={<PortalStatement />} />
+            <Route path="calculator" element={<PortalInstallmentCalculator />} />
+            <Route path="documents" element={<PortalDocuments />} />
+            <Route path="addresses" element={<PortalAddresses />} />
+            <Route path="profile" element={<PortalProfile />} />
+            <Route path="orders" element={<PortalOrders />} />
+            <Route path="wishlist" element={<PortalWishlist />} />
+            <Route path="support" element={<PortalSupport />} />
+            <Route path="notifications" element={<PortalNotifications />} />
+            <Route path="points" element={<PortalPointsHistory />} />
+            <Route path="products" element={<ProductCatalog />} />
+            <Route path="products/:id" element={<ProductDetails />} />
+            <Route path="cart" element={<ShoppingCart />} />
+            <Route path="checkout" element={<PortalCheckout />} />
           </Route>
 
           <Route path="/login" element={
@@ -231,7 +258,7 @@ export default function App() {
           } />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
-          
+
           {/* Main App Routes (Protected) - Must be last */}
           <Route path="/*" element={
             <ProtectedRoute>

@@ -69,7 +69,7 @@ export const usePortalStore = create((set, get) => ({
       }
 
       localStorage.setItem('portal_cart', JSON.stringify(newCart));
-      return { cart: newCart, isCartOpen: true }; // Open cart on add
+      return { cart: newCart, isCartOpen: true };
     });
   },
 
@@ -196,7 +196,6 @@ export const usePortalStore = create((set, get) => ({
         localStorage.setItem('portal_customer', JSON.stringify(updatedCustomer));
         set({ customer: updatedCustomer });
 
-        // Update tenant branding if available
         if (data.store) {
           const currentTenant = get().tenant || {};
           const updatedTenant = {
@@ -243,6 +242,51 @@ export const usePortalStore = create((set, get) => ({
     }
   },
 
+  downloadInvoicePDF: async (id) => {
+    try {
+      const res = await portalApi.get(`/portal/invoices/${id}/pdf`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `invoice_${id}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: 'فشل تحميل الفاتورة' };
+    }
+  },
+
+  payInvoice: async (id, amount, paymentMethod, notes) => {
+    set({ loading: true });
+    try {
+      const res = await portalApi.post(`/portal/invoices/${id}/pay`, {
+        amount,
+        paymentMethod: paymentMethod || 'online',
+        notes
+      });
+      set({ loading: false });
+
+      // Update customer balance
+      const currentCustomer = get().customer;
+      if (currentCustomer) {
+        const updatedCustomer = {
+          ...currentCustomer,
+          outstanding: currentCustomer.outstanding - amount
+        };
+        localStorage.setItem('portal_customer', JSON.stringify(updatedCustomer));
+        set({ customer: updatedCustomer });
+      }
+
+      return { success: true, data: res.data.data, message: res.data.message };
+    } catch (err) {
+      set({ loading: false });
+      return { success: false, message: err.response?.data?.message || 'فشل الدفع' };
+    }
+  },
+
   // ═══════════════ STATEMENT ═══════════════
 
   fetchStatement: async (startDate, endDate) => {
@@ -254,6 +298,26 @@ export const usePortalStore = create((set, get) => ({
       return res.data.data;
     } catch (err) {
       return null;
+    }
+  },
+
+  downloadStatementPDF: async (startDate, endDate) => {
+    try {
+      const params = {};
+      if (startDate) params.startDate = startDate;
+      if (endDate) params.endDate = endDate;
+      const res = await portalApi.get('/portal/statement/pdf', { params, responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `statement.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: 'فشل تحميل كشف الحساب' };
     }
   },
 
@@ -271,18 +335,159 @@ export const usePortalStore = create((set, get) => ({
     }
   },
 
-  // ═══════════════ CHECKOUT ═══════════════
+  // ═══════════════ ORDERS ═══════════════
 
-  checkout: async (items) => {
-    set({ loading: true });
+  fetchOrders: async (page = 1, status = 'all') => {
     try {
-      const res = await portalApi.post('/portal/cart/checkout', { items });
-      set({ loading: false });
+      const params = { page, limit: 15 };
+      if (status && status !== 'all') params.status = status;
+      const res = await portalApi.get('/portal/orders', { params });
+      return res.data.data;
+    } catch (err) {
+      return null;
+    }
+  },
+
+  fetchOrderDetails: async (id) => {
+    try {
+      const res = await portalApi.get(`/portal/orders/${id}`);
+      return res.data.data;
+    } catch (err) {
+      return null;
+    }
+  },
+
+  reorder: async (orderId) => {
+    try {
+      const res = await portalApi.post(`/portal/orders/${orderId}/reorder`);
+      const { items } = res.data.data;
+      // Add items to cart
+      const currentCart = get().cart;
+      const newCart = [...currentCart];
+      items.forEach(item => {
+        const existingIdx = newCart.findIndex(c => c.cartKey === item.cartKey);
+        if (existingIdx > -1) {
+          newCart[existingIdx].quantity += item.quantity;
+        } else {
+          newCart.push(item);
+        }
+      });
+      localStorage.setItem('portal_cart', JSON.stringify(newCart));
+      set({ cart: newCart, isCartOpen: true });
+      return { success: true, message: res.data.message };
+    } catch (err) {
+      return { success: false, message: err.response?.data?.message || 'فشل إعادة الطلب' };
+    }
+  },
+
+  // Checkout (place order with shipping details)
+  checkout: async (items, shippingAddress, notes) => {
+    try {
+      const res = await portalApi.post('/portal/cart/checkout', {
+        items,
+        shippingAddress,
+        notes,
+      });
       return { success: true, data: res.data.data, message: res.data.message };
     } catch (err) {
+      return { success: false, message: err.response?.data?.message || 'فشل إنشاء الطلب' };
+    }
+  },
+
+  // ═══════════════ NOTIFICATIONS ═══════════════
+
+  unreadCount: 0,
+
+  fetchNotifications: async (page = 1) => {
+    try {
+      const res = await portalApi.get('/portal/notifications', { params: { page } });
+      const data = res.data.data;
+      set({ unreadCount: data.unreadCount || 0 });
+      return data;
+    } catch (err) {
+      return null;
+    }
+  },
+
+  fetchUnreadCount: async () => {
+    try {
+      const res = await portalApi.get('/portal/notifications/unread-count');
+      const count = res.data.data.count || 0;
+      set({ unreadCount: count });
+      return count;
+    } catch (err) {
+      return 0;
+    }
+  },
+
+  markNotificationRead: async (id) => {
+    try {
+      await portalApi.put(`/portal/notifications/${id}/read`);
+      set((state) => ({ unreadCount: Math.max(0, state.unreadCount - 1) }));
+      return true;
+    } catch (err) {
+      return false;
+    }
+  },
+
+  markAllNotificationsRead: async () => {
+    try {
+      await portalApi.put('/portal/notifications/read-all');
+      set({ unreadCount: 0 });
+      return true;
+    } catch (err) {
+      return false;
+    }
+  },
+
+  // ═══════════════ WISHLIST ═══════════════
+
+  wishlistIds: JSON.parse(localStorage.getItem('portal_wishlist') || '[]'),
+
+  toggleWishlist: async (productId) => {
+    try {
+      const res = await portalApi.post(`/portal/wishlist/${productId}`);
+      const { wishlisted } = res.data.data;
+      set((state) => {
+        let newIds;
+        if (wishlisted) {
+          newIds = [...state.wishlistIds, productId];
+        } else {
+          newIds = state.wishlistIds.filter(id => id !== productId);
+        }
+        localStorage.setItem('portal_wishlist', JSON.stringify(newIds));
+        return { wishlistIds: newIds };
+      });
+      return { success: true, wishlisted, message: res.data.message };
+    } catch (err) {
+      return { success: false, message: err.response?.data?.message || 'فشل العملية' };
+    }
+  },
+
+  fetchWishlist: async () => {
+    try {
+      const res = await portalApi.get('/portal/wishlist');
+      const products = res.data.data.products || [];
+      const ids = products.map(p => p._id);
+      localStorage.setItem('portal_wishlist', JSON.stringify(ids));
+      set({ wishlistIds: ids });
+      return products;
+    } catch (err) {
+      return [];
+    }
+  },
+
+  // ═══════════════ SUPPORT ═══════════════
+
+  sendSupportMessage: async (subject, message, type = 'inquiry') => {
+    set({ loading: true });
+    try {
+      const res = await portalApi.post('/portal/support', { subject, message, type });
       set({ loading: false });
-      const msg = err.response?.data?.message || 'فشل إتمام الطلب';
-      return { success: false, message: msg };
+      return { success: true, message: res.data.message, data: res.data.data };
+    } catch (err) {
+      set({ loading: false });
+      return { success: false, message: err.response?.data?.message || 'فشل إرسال الرسالة' };
     }
   },
 
@@ -302,6 +507,39 @@ export const usePortalStore = create((set, get) => ({
     }
   },
 
+  fetchDocuments: async () => {
+    try {
+      const res = await portalApi.get('/portal/documents');
+      return res.data.data;
+    } catch (err) {
+      return [];
+    }
+  },
+
+  uploadDocument: async (type, file) => {
+    set({ loading: true });
+    try {
+      const res = await portalApi.post('/portal/documents', { type, file });
+      set({ loading: false });
+      return { success: true, message: res.data.message, documents: res.data.data };
+    } catch (err) {
+      set({ loading: false });
+      return { success: false, message: err.response?.data?.message || 'فشل رفع المستند' };
+    }
+  },
+
+  deleteDocument: async (id) => {
+    set({ loading: true });
+    try {
+      const res = await portalApi.delete(`/portal/documents/${id}`);
+      set({ loading: false });
+      return { success: true, message: res.data.message, documents: res.data.data };
+    } catch (err) {
+      set({ loading: false });
+      return { success: false, message: err.response?.data?.message || 'فشل حذف المستند' };
+    }
+  },
+
   changePassword: async (currentPassword, newPassword, confirmPassword) => {
     set({ loading: true });
     try {
@@ -314,11 +552,90 @@ export const usePortalStore = create((set, get) => ({
     }
   },
 
+  // ═══════════════ RETURNS ═══════════════
+
+  createReturnRequest: async (data) => {
+    set({ loading: true });
+    try {
+      const res = await portalApi.post('/portal/returns', data);
+      set({ loading: false });
+      return { success: true, message: res.data.message };
+    } catch (err) {
+      set({ loading: false });
+      return { success: false, message: err.response?.data?.message || 'فشل تقديم الطلب' };
+    }
+  },
+
+  fetchReturnRequests: async () => {
+    try {
+      const res = await portalApi.get('/portal/returns');
+      return res.data.data;
+    } catch (err) {
+      return [];
+    }
+  },
+
+  // ═══════════════ ADDRESSES ═══════════════
+
+  fetchAddresses: async () => {
+    try {
+      const res = await portalApi.get('/portal/addresses');
+      return res.data.data;
+    } catch (err) {
+      return [];
+    }
+  },
+
+  addAddress: async (data) => {
+    set({ loading: true });
+    try {
+      const res = await portalApi.post('/portal/addresses', data);
+      set({ loading: false });
+      return { success: true, message: res.data.message, addresses: res.data.data };
+    } catch (err) {
+      set({ loading: false });
+      return { success: false, message: err.response?.data?.message || 'فشل إضافة العنوان' };
+    }
+  },
+
+  updateAddress: async (id, data) => {
+    set({ loading: true });
+    try {
+      const res = await portalApi.put(`/portal/addresses/${id}`, data);
+      set({ loading: false });
+      return { success: true, message: res.data.message, addresses: res.data.data };
+    } catch (err) {
+      set({ loading: false });
+      return { success: false, message: err.response?.data?.message || 'فشل تحديث العنوان' };
+    }
+  },
+
+  deleteAddress: async (id) => {
+    set({ loading: true });
+    try {
+      const res = await portalApi.delete(`/portal/addresses/${id}`);
+      set({ loading: false });
+      return { success: true, message: res.data.message, addresses: res.data.data };
+    } catch (err) {
+      set({ loading: false });
+      return { success: false, message: err.response?.data?.message || 'فشل حذف العنوان' };
+    }
+  },
+
   // ═══════════════ POINTS ═══════════════
 
   fetchPoints: async () => {
     try {
       const res = await portalApi.get('/portal/points');
+      return res.data.data;
+    } catch (err) {
+      return null;
+    }
+  },
+
+  fetchPointsHistory: async () => {
+    try {
+      const res = await portalApi.get('/portal/points/history');
       return res.data.data;
     } catch (err) {
       return null;

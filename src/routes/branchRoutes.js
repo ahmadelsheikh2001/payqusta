@@ -13,4 +13,14 @@ router.post('/', branchController.createBranch);
 router.put('/:id', branchController.updateBranch);
 router.delete('/:id', branchController.deleteBranch);
 
+// Branch Stats & Management
+router.get('/:id/stats', branchController.getBranchStats);
+
+// Shift Management
+router.post('/:id/shift/start', branchController.startShift);
+router.post('/:id/shift/end', branchController.endShift);
+
+// Settlement
+router.post('/:id/settlement', branchController.settleBranch);
+
 module.exports = router;

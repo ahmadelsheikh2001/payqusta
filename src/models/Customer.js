@@ -35,16 +35,49 @@ const customerSchema = new mongoose.Schema(
     address: { type: String, trim: true },
     // National ID or tax ID
     nationalId: { type: String, trim: true },
-    
+    // Extended profile fields
+    profilePhoto: { type: String, default: null }, // base64 data URL or external URL
+    dateOfBirth: { type: Date },
+    gender: { type: String, enum: ['male', 'female', ''], default: '' },
+    whatsappNumber: { type: String, trim: true }, // renamed to avoid conflict with whatsapp object
+    bio: { type: String, maxlength: 300 }, // short personal note
+
+    // KYC Documents
+    documents: [{
+      type: {
+        type: String,
+        enum: ['national_id', 'passport', 'utility_bill', 'contract', 'other'],
+        required: true
+      },
+      status: {
+        type: String,
+        enum: ['pending', 'approved', 'rejected'],
+        default: 'pending'
+      },
+      url: { type: String, required: true }, // base64 or external url
+      rejectionReason: { type: String },
+      uploadedAt: { type: Date, default: Date.now }
+    }],
+
+    // Address Book
+    addresses: [{
+      label: { type: String, default: 'المنزل' }, // Home, Work, Other
+      street: { type: String, required: true },
+      city: { type: String, required: true },
+      state: { type: String },
+      zipCode: { type: String },
+      isDefault: { type: Boolean, default: false }
+    }],
+
     // Portal Authentication
-    password: { 
-      type: String, 
+    password: {
+      type: String,
       select: false,
-      minlength: 6 
+      minlength: 6
     },
-    isPortalActive: { 
-      type: Boolean, 
-      default: true 
+    isPortalActive: {
+      type: Boolean,
+      default: true
     },
     lastLogin: { type: Date },
 
@@ -116,6 +149,12 @@ const customerSchema = new mongoose.Schema(
         payments: { type: Boolean, default: true },      // تأكيد استلام الدفع
       },
     },
+    // Wishlist
+    wishlist: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Product',
+    }],
+    barcode: { type: String, trim: true },
     // Notes
     notes: { type: String, maxlength: 2000 },
     tags: [{ type: String }],
@@ -132,20 +171,48 @@ const customerSchema = new mongoose.Schema(
 const bcrypt = require('bcryptjs');
 
 customerSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) {
-    next();
+  if (!this.isModified('password') || !this.password) {
+    return next();
   }
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
+  next();
 });
 
 // Match user entered password to hashed password in database
 customerSchema.methods.matchPassword = async function (enteredPassword) {
+  if (!this.password) return false;
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
+// Pre-save Migration & Auto-generation
+customerSchema.pre('save', function (next) {
+  // 1. Handle legacy whatsapp string
+  if (typeof this.whatsapp === 'string') {
+    if (this.whatsapp.trim()) {
+      this.whatsappNumber = this.whatsapp;
+    }
+    this.whatsapp = undefined;
+  }
+
+  // 2. Convert empty strings to undefined for sparse indexes
+  if (this.whatsappNumber === '') this.whatsappNumber = undefined;
+  if (this.barcode === '') this.barcode = undefined;
+
+  // 3. Generate barcode if missing
+  if (!this.barcode) {
+    const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const randomPart = Math.floor(1000 + Math.random() * 9000);
+    this.barcode = `CST-${datePart}-${randomPart}`;
+  }
+
+  next();
+});
+
 // Indexes
 customerSchema.index({ tenant: 1, phone: 1 }, { unique: true });
+customerSchema.index({ tenant: 1, barcode: 1 }, { unique: true, sparse: true });
+customerSchema.index({ tenant: 1, whatsappNumber: 1 }, { unique: false, sparse: true });
 customerSchema.index({ tenant: 1, name: 'text' });
 customerSchema.index({ tenant: 1, tier: 1 });
 customerSchema.index({ tenant: 1, 'financials.outstandingBalance': -1 });

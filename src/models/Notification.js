@@ -13,11 +13,16 @@ const notificationSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
-    // Who should see this notification
+    // Who should see this notification (vendor/admin user)
     recipient: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
+      index: true,
+    },
+    // Customer recipient (for portal notifications)
+    customerRecipient: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Customer',
       index: true,
     },
     // Notification type
@@ -36,6 +41,9 @@ const notificationSchema = new mongoose.Schema(
         'new_customer',          // عميل جديد
         'customer_vip',          // عميل ترقى لـ VIP
         'system',                // إشعار نظام
+        'order',                 // طلب جديد
+        'order_status',          // تحديث حالة طلب
+        'support_reply',         // رد على رسالة دعم
       ],
     },
     // Display info
@@ -87,6 +95,7 @@ const notificationSchema = new mongoose.Schema(
 
 // Indexes
 notificationSchema.index({ tenant: 1, recipient: 1, isRead: 1, createdAt: -1 });
+notificationSchema.index({ tenant: 1, customerRecipient: 1, isRead: 1, createdAt: -1 });
 notificationSchema.index({ createdAt: 1 }, { expireAfterSeconds: 90 * 24 * 60 * 60 }); // Auto-delete after 90 days
 
 // Static: Create a notification
