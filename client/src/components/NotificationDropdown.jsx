@@ -4,7 +4,7 @@ import {
   Bell, Check, CheckCheck, Clock, AlertTriangle, CreditCard,
   FileText, Package, Truck, UserPlus, Star, X, Trash2, ChevronDown,
 } from 'lucide-react';
-import { api } from '../store';
+import { api, API_URL } from '../store';
 
 const iconMap = {
   clock: Clock,
@@ -40,7 +40,7 @@ export default function NotificationDropdown() {
     try {
       const { data } = await api.get('/notifications/unread-count');
       setUnreadCount(data.data?.count || 0);
-    } catch (e) {}
+    } catch (e) { }
   }, []);
 
   // Fetch notifications
@@ -49,7 +49,7 @@ export default function NotificationDropdown() {
     try {
       const { data } = await api.get('/notifications', { params: { limit: 20 } });
       setNotifications(data.data || []);
-    } catch (e) {}
+    } catch (e) { }
     setLoading(false);
   }, []);
 
@@ -66,7 +66,7 @@ export default function NotificationDropdown() {
       if (document.hidden) return; // Don't connect if hidden
 
       try {
-        eventSource = new EventSource(`/api/v1/notifications/stream?token=${token}`);
+        eventSource = new EventSource(`${API_URL}/notifications/stream?token=${token}`);
 
         eventSource.onopen = () => {
           retryCount = 0;
@@ -83,7 +83,7 @@ export default function NotificationDropdown() {
             if (window.Notification && window.Notification.permission === 'granted') {
               new window.Notification(notification.title, { body: notification.message, icon: '/favicon.svg' });
             }
-          } catch (e) {}
+          } catch (e) { }
         };
 
         eventSource.onerror = () => {
@@ -93,7 +93,7 @@ export default function NotificationDropdown() {
           retryCount++;
           retryTimeout = setTimeout(connect, delay);
         };
-      } catch (e) {}
+      } catch (e) { }
     };
 
     // Initial connect if visible
@@ -176,7 +176,7 @@ export default function NotificationDropdown() {
         prev.map((n) => (n._id === id ? { ...n, isRead: true } : n))
       );
       setUnreadCount((prev) => Math.max(0, prev - 1));
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const markAllRead = async () => {
@@ -184,14 +184,14 @@ export default function NotificationDropdown() {
       await api.patch('/notifications/read-all');
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
       setUnreadCount(0);
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const deleteNotification = async (id) => {
     try {
       await api.delete(`/notifications/${id}`);
       setNotifications((prev) => prev.filter((n) => n._id !== id));
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const handleClick = (notification) => {
@@ -271,9 +271,8 @@ export default function NotificationDropdown() {
                   <div
                     key={n._id}
                     onClick={() => handleClick(n)}
-                    className={`flex items-start gap-3 px-5 py-3.5 cursor-pointer border-b border-gray-50 dark:border-gray-800/50 transition-all hover:bg-gray-50 dark:hover:bg-gray-800/30 group ${
-                      !n.isRead ? 'bg-primary-50/30 dark:bg-primary-500/5' : ''
-                    }`}
+                    className={`flex items-start gap-3 px-5 py-3.5 cursor-pointer border-b border-gray-50 dark:border-gray-800/50 transition-all hover:bg-gray-50 dark:hover:bg-gray-800/30 group ${!n.isRead ? 'bg-primary-50/30 dark:bg-primary-500/5' : ''
+                      }`}
                   >
                     {/* Icon */}
                     <div className={`w-10 h-10 rounded-xl ${colors.bg} ${colors.text} flex items-center justify-center flex-shrink-0 ring-2 ${colors.ring}`}>

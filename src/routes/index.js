@@ -90,7 +90,6 @@ router.post('/auth/switch-tenant', tenantController.switchTenant);
 // --- Tenant / Branches ---
 // Note: /tenants/branch removed - use /branches instead (branchController is more complete)
 router.use('/branches', require('./branchRoutes'));
-router.get('/tenants/my-tenants', authorize('vendor', 'admin', 'coordinator'), tenantController.getMyBranches); // Renamed for clarity
 
 // --- Dashboard ---
 router.get('/dashboard/overview', authorize('vendor', 'admin', 'coordinator'), dashboardController.getOverview);

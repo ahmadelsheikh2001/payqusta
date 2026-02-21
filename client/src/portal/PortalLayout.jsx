@@ -214,28 +214,34 @@ export default function PortalLayout() {
         </div>
 
         {/* ═══════════════ MOBILE NAV ═══════════════ */}
-        <nav className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 md:hidden z-20 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] pb-safe">
-          <div className="flex justify-around items-center">
-            {navItems.map((item) => (
-              <button
-                key={item.path}
-                onClick={() => item.isCart ? toggleCart() : navigate(item.path)}
-                className={`flex flex-col items-center py-2 px-2 transition-colors min-w-0 flex-1 ${isActive(item.path) && !item.isCart
-                  ? 'text-primary-600 dark:text-primary-400'
-                  : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400'
-                  }`}
-              >
-                <div className="relative">
-                  <item.icon className={`w-5 h-5 mb-0.5 ${isActive(item.path) && !item.isCart ? 'fill-current' : ''}`} />
-                  {item.badge > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-red-500 text-white text-[9px] font-bold flex items-center justify-center rounded-full border border-white dark:border-gray-900">
-                      {item.badge}
-                    </span>
-                  )}
-                </div>
-                <span className="text-[10px] font-medium truncate">{item.label}</span>
-              </button>
-            ))}
+        <nav className="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur-lg border-t border-gray-200 dark:border-gray-800 md:hidden z-20 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] pb-[env(safe-area-inset-bottom)]">
+          <div className="flex justify-around items-center px-2 py-1">
+            {navItems.map((item) => {
+              // Hide some items on mobile to prevent crowding
+              if (['/portal/calculator', '/portal/returns', '/portal/documents'].includes(item.path)) return null;
+
+              const active = isActive(item.path) && !item.isCart;
+              return (
+                <button
+                  key={item.path}
+                  onClick={() => item.isCart ? toggleCart() : navigate(item.path)}
+                  className={`flex flex-col items-center justify-center py-2 px-1 min-w-[64px] rounded-2xl transition-all active:scale-95 ${active
+                      ? 'text-primary-600 dark:text-primary-400 font-bold'
+                      : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
+                    }`}
+                >
+                  <div className={`relative p-1.5 rounded-xl transition-all ${active ? 'bg-primary-50 dark:bg-primary-900/20' : ''}`}>
+                    <item.icon className={`w-6 h-6 ${active ? 'fill-current/20' : ''}`} strokeWidth={active ? 2.5 : 2} />
+                    {item.badge > 0 && (
+                      <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white dark:border-gray-900">
+                        {item.badge > 9 ? '9+' : item.badge}
+                      </span>
+                    )}
+                  </div>
+                  <span className={`text-[10px] mt-0.5 truncate ${active ? 'opacity-100' : 'opacity-80'}`}>{item.label}</span>
+                </button>
+              );
+            })}
           </div>
         </nav>
 

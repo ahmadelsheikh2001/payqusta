@@ -454,30 +454,7 @@ class ProductController {
     ApiResponse.success(res, product, 'تم حذف الصورة بنجاح');
   });
 
-  /**
-   * GET /api/v1/products/categories
-   * Get all product categories for tenant
-   */
-  getCategories = catchAsync(async (req, res, next) => {
-    // 1. Try to get configured categories from tenant settings
-    const Tenant = require('../models/Tenant');
-    const tenant = await Tenant.findById(req.tenantId);
 
-    let settingsCats = tenant?.settings?.categories || [];
-    // Extract names from objects, handle legacy strings
-    let categoryNames = settingsCats.map(c => typeof c === 'string' ? c : c.name);
-
-    // 2. If empty or we want to include existing used categories, we can aggregate
-    // For now, let's mix both: configured + actually used
-    const usedCategories = await Product.distinct('category', { ...req.tenantFilter, isActive: true });
-
-    // Merge and de-duplicate
-    const allCategories = [...new Set([...categoryNames, ...usedCategories])].sort();
-
-    // Prevent caching
-    res.set('Cache-Control', 'no-store');
-    ApiResponse.success(res, allCategories);
-  });
 }
 
 module.exports = new ProductController();

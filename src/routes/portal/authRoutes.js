@@ -81,4 +81,7 @@ router.post('/reviews', portalController.submitReview);
 // Coupons (validate from portal during checkout)
 router.post('/coupons/validate', portalController.validateCoupon);
 
+// Gamification
+router.post('/gamification/daily-reward', portalController.claimDailyReward);
+
 module.exports = router;

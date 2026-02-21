@@ -33,7 +33,7 @@ const PaymentLinkGenerator = ({ invoice, customer, onClose }) => {
   const [copied, setCopied] = useState(false);
 
   // Calculate remaining amount
-  const remainingAmount = invoice.totalAmount - invoice.amountPaid;
+  const remainingAmount = invoice.totalAmount - invoice.paidAmount;
 
   useEffect(() => {
     // Fetch available gateways

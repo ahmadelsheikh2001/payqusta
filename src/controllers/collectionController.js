@@ -87,8 +87,8 @@ exports.collectPayment = catchAsync(async (req, res, next) => {
   // Update invoice
   const invoice = await Invoice.findById(task.invoice);
   if (invoice) {
-    invoice.amountPaid += amount;
-    if (invoice.amountPaid >= invoice.totalAmount) {
+    invoice.paidAmount += amount;
+    if (invoice.paidAmount >= invoice.totalAmount) {
       invoice.status = 'paid';
     } else {
       invoice.status = 'partially_paid';
@@ -276,7 +276,7 @@ exports.assignTasks = catchAsync(async (req, res, next) => {
       customer: customer._id,
       invoice: invoice._id,
       tenant: req.user.tenant,
-      amount: invoice.totalAmount - invoice.amountPaid,
+      amount: invoice.totalAmount - invoice.paidAmount,
       dueDate: invoice.dueDate,
       location: customer.location,
       assignedBy: req.user._id,

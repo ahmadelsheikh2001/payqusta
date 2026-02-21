@@ -6,7 +6,7 @@
 import { create } from 'zustand';
 import axios from 'axios';
 
-const API_URL = '/api/v1';
+export const API_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
 // Configure Axios defaults
 export const api = axios.create({
@@ -145,7 +145,11 @@ export const useAuthStore = create((set, get) => ({
     try {
       // Unified endpoint: use /branches (branchController) instead of /tenants/my-branches
       const { data } = await api.get('/branches');
-      return data.data;
+      const payload = data?.data;
+      if (Array.isArray(payload)) return payload;
+      if (Array.isArray(payload?.branches)) return payload.branches;
+      if (Array.isArray(payload?.data)) return payload.data;
+      return [];
     } catch (error) {
       return [];
     }

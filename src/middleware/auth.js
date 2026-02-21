@@ -45,7 +45,8 @@ const protect = async (req, res, next) => {
     }
 
     // Check session version (logout from all devices)
-    if (decoded.sv !== undefined && decoded.sv !== (user.sessionVersion || 0)) {
+    const tokenSv = decoded.sv || 0;
+    if (tokenSv !== (user.sessionVersion || 0)) {
       return next(AppError.unauthorized('تم إنهاء جلستك. يرجى تسجيل الدخول مرة أخرى'));
     }
 
@@ -93,12 +94,12 @@ const tenantScope = (req, res, next) => {
   // Admin with a tenant gets scoped too; admin without tenant gets global access ONLY if explicitly designed (e.g. Super Admin)
   // But here 'admin' usually means Tenant Admin. Super Admin has verifySuperAdmin or isSuperAdmin flag.
   // We must ensure that if a user has a tenant, they are scoped to it, regardless of role 'admin'.
-  
+
   if (req.user && req.user.tenant && !req.user.isSuperAdmin) {
-     req.tenantId = req.user.tenant.toString();
-     req.tenantFilter = { tenant: req.tenantId };
+    req.tenantId = req.user.tenant.toString();
+    req.tenantFilter = { tenant: req.tenantId };
   } else {
-     req.tenantFilter = req.tenantId ? { tenant: req.tenantId } : {};
+    req.tenantFilter = req.tenantId ? { tenant: req.tenantId } : {};
   }
 
   next();

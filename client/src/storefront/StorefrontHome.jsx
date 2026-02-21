@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ShoppingBag, TrendingUp, Star, ArrowRight } from 'lucide-react';
-import axios from 'axios';
+import { api } from '../store';
 import { Card, LoadingSpinner, Badge } from '../components/UI';
 
 export default function StorefrontHome() {
@@ -17,8 +17,8 @@ export default function StorefrontHome() {
     setLoading(true);
     try {
       const [productsRes, settingsRes] = await Promise.all([
-        axios.get('/api/v1/products?limit=8&isActive=true'),
-        axios.get('/api/v1/settings')
+        api.get('/products?limit=8&isActive=true'),
+        api.get('/settings')
       ]);
       setFeaturedProducts(productsRes.data.data);
       setSettings(settingsRes.data.data);
@@ -41,8 +41,8 @@ export default function StorefrontHome() {
         <p className="text-xl opacity-90 mb-8">
           اكتشف أفضل المنتجات بأسعار مميزة
         </p>
-        <Link 
-          to="/store/products" 
+        <Link
+          to="/store/products"
           className="inline-flex items-center gap-2 bg-white text-primary-600 px-8 py-3 rounded-xl font-bold hover:shadow-lg transition-shadow"
         >
           تصفح المنتجات
@@ -92,8 +92,8 @@ export default function StorefrontHome() {
                 {/* Product Image */}
                 <div className="aspect-square bg-gray-100 dark:bg-gray-800 relative overflow-hidden">
                   {product.image ? (
-                    <img 
-                      src={product.image} 
+                    <img
+                      src={product.image}
                       alt={product.name}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                     />
@@ -113,7 +113,7 @@ export default function StorefrontHome() {
                 <div className="p-4">
                   <h3 className="font-bold text-lg mb-1 line-clamp-1">{product.name}</h3>
                   <p className="text-gray-500 text-sm mb-3 line-clamp-2">{product.description}</p>
-                  
+
                   <div className="flex justify-between items-center">
                     <div>
                       <span className="text-2xl font-black text-primary-600">

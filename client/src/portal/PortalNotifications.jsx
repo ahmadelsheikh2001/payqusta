@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { usePortalStore } from '../store/portalStore';
 import { useThemeStore } from '../store';
 import { Bell, CheckCircle, Clock, ShoppingBag, CreditCard, AlertTriangle, MessageCircle, Star, Check, CheckCheck } from 'lucide-react';
+import PortalEmptyState from './components/PortalEmptyState';
+import PortalSkeleton from './components/PortalSkeleton';
 
 const iconMap = {
   'shopping-bag': ShoppingBag,
@@ -100,17 +102,14 @@ export default function PortalNotifications() {
 
       {/* Loading */}
       {loading ? (
-        <div className="flex justify-center py-16">
-          <div className="w-10 h-10 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
-        </div>
+        <PortalSkeleton count={5} type="list" className="mt-4" />
       ) : notifications.length === 0 ? (
-        <div className="text-center py-16">
-          <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Bell className="w-8 h-8 text-gray-400" />
-          </div>
-          <p className="text-gray-500 dark:text-gray-400 font-medium">لا توجد إشعارات</p>
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">سيتم إعلامك بأي تحديثات جديدة</p>
-        </div>
+        <PortalEmptyState
+          icon={Bell}
+          title="لا توجد إشعارات"
+          message="سيتم إعلامك بأي تحديثات جديدة"
+          className="my-8"
+        />
       ) : (
         <div className="space-y-2">
           {notifications.map((notif) => {
@@ -122,8 +121,8 @@ export default function PortalNotifications() {
                 key={notif._id}
                 onClick={() => handleNotificationClick(notif)}
                 className={`bg-white dark:bg-gray-800/80 rounded-2xl p-4 border transition-all cursor-pointer ${notif.isRead
-                    ? 'border-gray-100 dark:border-gray-700 opacity-70'
-                    : 'border-primary-200 dark:border-primary-800 shadow-sm shadow-primary-500/5'
+                  ? 'border-gray-100 dark:border-gray-700 opacity-70'
+                  : 'border-primary-200 dark:border-primary-800 shadow-sm shadow-primary-500/5'
                   }`}
               >
                 <div className="flex gap-3">
@@ -156,8 +155,8 @@ export default function PortalNotifications() {
               key={i}
               onClick={() => loadNotifications(i + 1)}
               className={`w-8 h-8 rounded-lg text-sm font-bold ${pagination.page === i + 1
-                  ? 'bg-primary-500 text-white'
-                  : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700'
+                ? 'bg-primary-500 text-white'
+                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700'
                 }`}
             >
               {i + 1}

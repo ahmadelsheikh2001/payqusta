@@ -3,6 +3,8 @@ import { usePortalStore } from '../store/portalStore';
 import { Heart, ShoppingBag, Package, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { notify } from '../components/AnimatedNotification';
+import PortalEmptyState from './components/PortalEmptyState';
+import PortalSkeleton from './components/PortalSkeleton';
 
 export default function PortalWishlist() {
     const { fetchWishlist, toggleWishlist, addToCart } = usePortalStore();
@@ -48,23 +50,16 @@ export default function PortalWishlist() {
             </div>
 
             {loading ? (
-                <div className="flex justify-center py-16">
-                    <div className="w-10 h-10 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
-                </div>
+                <PortalSkeleton count={4} type="card" className="mt-4" />
             ) : products.length === 0 ? (
-                <div className="text-center py-16">
-                    <div className="w-20 h-20 bg-red-50 dark:bg-red-900/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Heart className="w-10 h-10 text-red-300" />
-                    </div>
-                    <p className="text-gray-600 dark:text-gray-400 font-bold mb-1">قائمة المفضلة فارغة</p>
-                    <p className="text-sm text-gray-400 mb-6">احفظ المنتجات التي تعجبك هنا</p>
-                    <button
-                        onClick={() => navigate('/portal/products')}
-                        className="px-6 py-3 bg-primary-500 text-white rounded-xl font-bold text-sm hover:bg-primary-600 transition"
-                    >
-                        تصفح المنتجات
-                    </button>
-                </div>
+                <PortalEmptyState
+                    icon={Heart}
+                    title="قائمة المفضلة فارغة"
+                    message="احفظ المنتجات التي تعجبك هنا"
+                    actionText="تصفح المنتجات"
+                    onAction={() => navigate('/portal/products')}
+                    className="my-8"
+                />
             ) : (
                 <div className="grid grid-cols-2 gap-4">
                     {products.map(product => (

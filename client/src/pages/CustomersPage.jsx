@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Plus, Search, Users, MessageCircle, Star, Check, X, Eye, Printer,
   FileText, Send, Phone, Calendar, CreditCard, TrendingUp, TrendingDown,
@@ -9,13 +9,15 @@ import {
 import toast from 'react-hot-toast';
 import { notify } from '../components/AnimatedNotification';
 import { customersApi, creditApi, api } from '../store';
-import { Button, Input, Modal, Badge, Card, LoadingSpinner, EmptyState } from '../components/UI';
+import { Button, Input, Modal, Badge, Card, LoadingSpinner, EmptyState, OwnerTableSkeleton } from '../components/UI';
 import Pagination from '../components/Pagination';
 
 export default function CustomersPage() {
+  const FILTERS_STORAGE_KEY = 'owner_customers_filters_v1';
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ totalPages: 1, totalItems: 0 });
   const [tierFilter, setTierFilter] = useState('');
@@ -24,7 +26,17 @@ export default function CustomersPage() {
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ name: '', phone: '', email: '', address: '', notes: '', creditLimit: 10000, barcode: '' });
+  const [form, setForm] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    address: '',
+    notes: '',
+    creditLimit: 10000,
+    barcode: '',
+    password: '',
+    confirmPassword: '',
+  });
 
   // Customer Details Modal
   const [showDetails, setShowDetails] = useState(false);
@@ -48,20 +60,54 @@ export default function CustomersPage() {
   const LIMIT = 15;
 
   useEffect(() => {
+    try {
+      const saved = localStorage.getItem(FILTERS_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setSearch(parsed.search || '');
+        setTierFilter(parsed.tierFilter || '');
+        setBranchFilter(parsed.branchFilter || '');
+      }
+    } catch (_) { }
+
     // Load branches
     customersApi.getAll({}).then(() => { }); // Just to wake up
     // We need a way to get branches. Typically useAuthStore or a dedicated API.
     // Assuming we can get it from an API or just mocking for now since we added it to model.
     // Let's use the one from store if available or just fetch manually.
     import('../store').then(({ useAuthStore }) => {
-      useAuthStore.getState().getBranches().then(setBranches);
+      useAuthStore.getState().getBranches()
+        .then((result) => {
+          const normalizedBranches = Array.isArray(result)
+            ? result
+            : Array.isArray(result?.branches)
+              ? result.branches
+              : Array.isArray(result?.data)
+                ? result.data
+                : [];
+          setBranches(normalizedBranches);
+        })
+        .catch(() => setBranches([]));
     });
   }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => {
+    localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify({
+      search,
+      tierFilter,
+      branchFilter,
+    }));
+  }, [search, tierFilter, branchFilter]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params = { page, limit: LIMIT, search };
+      const params = { page, limit: LIMIT, search: debouncedSearch };
       if (tierFilter) params.tier = tierFilter;
       if (branchFilter) params.branch = branchFilter;
       const res = await customersApi.getAll(params);
@@ -69,12 +115,33 @@ export default function CustomersPage() {
       setPagination({ totalPages: res.data.pagination?.totalPages || 1, totalItems: res.data.pagination?.totalItems || 0 });
     } catch { toast.error('خطأ في تحميل العملاء'); }
     finally { setLoading(false); }
-  }, [page, search, tierFilter, branchFilter]);
+  }, [page, debouncedSearch, tierFilter, branchFilter]);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { setPage(1); }, [search, tierFilter, branchFilter]);
+  useEffect(() => { setPage(1); }, [debouncedSearch, tierFilter, branchFilter]);
 
-  const openAdd = () => { setEditId(null); setForm({ name: '', phone: '', email: '', address: '', notes: '', creditLimit: 10000, barcode: '' }); setShowModal(true); };
+  const resetFilters = () => {
+    setSearch('');
+    setTierFilter('');
+    setBranchFilter('');
+    localStorage.removeItem(FILTERS_STORAGE_KEY);
+  };
+
+  const openAdd = () => {
+    setEditId(null);
+    setForm({
+      name: '',
+      phone: '',
+      email: '',
+      address: '',
+      notes: '',
+      creditLimit: 10000,
+      barcode: '',
+      password: '',
+      confirmPassword: '',
+    });
+    setShowModal(true);
+  };
   const openEdit = (c, e) => {
     e?.stopPropagation();
     setEditId(c._id);
@@ -85,7 +152,9 @@ export default function CustomersPage() {
       address: c.address || '',
       notes: c.notes || '',
       creditLimit: c.financials?.creditLimit || 10000,
-      barcode: c.barcode || ''
+      barcode: c.barcode || '',
+      password: '',
+      confirmPassword: '',
     });
     setShowModal(true);
   };
@@ -119,13 +188,41 @@ export default function CustomersPage() {
 
   const handleSave = async () => {
     if (!form.name || !form.phone) return toast.error('الاسم والهاتف مطلوبين');
+    if (!editId && !form.password) return toast.error('كلمة المرور مطلوبة');
+    if (!editId && form.password.length < 6) return toast.error('كلمة المرور يجب أن تكون 6 أحرف على الأقل');
+    if (!editId && form.password !== form.confirmPassword) return toast.error('تأكيد كلمة المرور غير مطابق');
+
     setSaving(true);
     try {
-      if (editId) { await customersApi.update(editId, form); toast.success('تم تحديث العميل ✅'); }
-      else { await customersApi.create(form); toast.success('تم إضافة العميل ✅'); }
-      setShowModal(false); load();
-    } catch (err) { toast.error(err.response?.data?.message || 'حدث خطأ'); }
-    finally { setSaving(false); }
+      const payload = {
+        name: form.name,
+        phone: form.phone,
+        email: form.email,
+        address: form.address,
+        notes: form.notes,
+        creditLimit: form.creditLimit,
+        barcode: form.barcode,
+      };
+
+      if (!editId && form.password) {
+        payload.password = form.password;
+      }
+
+      if (editId) {
+        await customersApi.update(editId, payload);
+        toast.success('تم تحديث العميل');
+      } else {
+        await customersApi.create(payload);
+        toast.success('تم إضافة العميل');
+      }
+
+      setShowModal(false);
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'حدث خطأ');
+    } finally {
+      setSaving(false);
+    }
   };
 
   // Block/Unblock sales
@@ -254,8 +351,8 @@ export default function CustomersPage() {
   };
 
   const tierBadge = (tier) => {
-    if (tier === 'vip') return <Badge variant="warning">⭐ VIP</Badge>;
-    if (tier === 'premium') return <Badge variant="success">Premium</Badge>;
+    if (tier === 'vip') return <Badge variant="warning">â­ VIP</Badge>;
+    if (tier === 'premium') return <Badge variant="success">مميز</Badge>;
     return <Badge variant="gray">عادي</Badge>;
   };
 
@@ -263,7 +360,7 @@ export default function CustomersPage() {
     const map = {
       paid: { variant: 'success', label: 'مسدد', icon: CheckCircle },
       pending: { variant: 'warning', label: 'قيد السداد', icon: Clock },
-      partially_paid: { variant: 'primary', label: 'مسدد جزئياً', icon: Clock },
+      partially_paid: { variant: 'primary', label: 'Ù…Ø³Ø¯Ø¯ Ø¬Ø²Ø¦ÙŠØ§Ù‹', icon: Clock },
       overdue: { variant: 'danger', label: 'متأخر', icon: AlertTriangle },
     };
     const s = map[status] || map.pending;
@@ -334,16 +431,23 @@ export default function CustomersPage() {
         <select value={branchFilter} onChange={(e) => setBranchFilter(e.target.value)}
           className="px-3 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm cursor-pointer">
           <option value="">🏢 كل الفروع</option>
-          {branches.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
+          {(Array.isArray(branches) ? branches : []).map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
         </select>
 
         <select value={tierFilter} onChange={(e) => setTierFilter(e.target.value)}
           className="px-3 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm cursor-pointer">
           <option value="">كل العملاء</option>
           <option value="vip">⭐ VIP</option>
-          <option value="premium">Premium</option>
+          <option value="premium">مميز</option>
           <option value="normal">عادي</option>
         </select>
+        <button
+          type="button"
+          onClick={resetFilters}
+          className="px-3 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+        >
+          إعادة الفلاتر
+        </button>
         <Button icon={<Plus className="w-4 h-4" />} onClick={openAdd}>إضافة عميل</Button>
       </div>
 
@@ -366,7 +470,7 @@ export default function CustomersPage() {
       )}
 
       {/* Customers Table */}
-      {loading ? <LoadingSpinner /> : customers.length === 0 ? (
+      {loading ? <OwnerTableSkeleton rows={10} columns={8} /> : customers.length === 0 ? (
         <EmptyState icon={<Users className="w-8 h-8" />} title="لا يوجد عملاء" description={search ? `لا نتائج لـ "${search}"` : 'ابدأ بإضافة أول عميل'} />
       ) : (
         <>
@@ -450,9 +554,27 @@ export default function CustomersPage() {
         <div className="space-y-4">
           <Input label="اسم العميل *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           <Input label="رقم الهاتف *" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="01XXXXXXXXX" />
+          {!editId && (
+            <>
+              <Input
+                label="كلمة المرور *"
+                type="password"
+                value={form.password}
+                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                placeholder="6 أحرف أو أكثر"
+              />
+              <Input
+                label="تأكيد كلمة المرور *"
+                type="password"
+                value={form.confirmPassword}
+                onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
+                placeholder="أعد إدخال كلمة المرور"
+              />
+            </>
+          )}
           <Input label="البريد الإلكتروني" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
           <Input label="العنوان" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-          <Input label="الباركود (barcode)" value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} placeholder="اتركه فارغاً للتوليد التلقائي" />
+          <Input label="الباركود" value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} placeholder="اتركه فارغاً للتوليد التلقائي" />
           <Input label="الحد الائتماني (ج.م)" type="number" value={form.creditLimit} onChange={(e) => setForm({ ...form, creditLimit: Number(e.target.value) })} />
         </div>
         <div className="flex justify-end gap-3 mt-6">
@@ -782,7 +904,7 @@ export default function CustomersPage() {
                 <div className="info-grid">
                   <div className="info-box"><label>اسم العميل</label><span>{selectedCustomer.name}</span></div>
                   <div className="info-box"><label>رقم الهاتف</label><span dir="ltr">{selectedCustomer.phone}</span></div>
-                  <div className="info-box"><label>الحالة</label><span>{selectedCustomer.tier === 'vip' ? '⭐ VIP' : selectedCustomer.tier === 'premium' ? 'Premium' : 'عادي'}</span></div>
+                  <div className="info-box"><label>الحالة</label><span>{selectedCustomer.tier === 'vip' ? '⭐ VIP' : selectedCustomer.tier === 'premium' ? 'مميز' : 'عادي'}</span></div>
                   <div className="info-box"><label>إجمالي المشتريات</label><span>{fmt(selectedCustomer.financials?.totalPurchases)} ج.م</span></div>
                   <div className="info-box"><label>إجمالي المدفوع</label><span style={{ color: 'green' }}>{fmt(selectedCustomer.financials?.totalPaid)} ج.م</span></div>
                   <div className="info-box"><label>المتبقي</label><span style={{ color: (selectedCustomer.financials?.outstandingBalance || 0) > 0 ? 'red' : 'green' }}>{fmt(selectedCustomer.financials?.outstandingBalance)} ج.م</span></div>
@@ -848,3 +970,4 @@ export default function CustomersPage() {
     </div>
   );
 }
+

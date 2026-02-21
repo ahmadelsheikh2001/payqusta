@@ -119,6 +119,10 @@ class AdminController {
   createTenant = catchAsync(async (req, res, next) => {
     const { name, ownerName, ownerEmail, ownerPhone, ownerPassword, plan } = req.body;
 
+    if (!ownerPassword || ownerPassword.length < 8) {
+      return next(AppError.badRequest('كلمة مرور صاحب المتجر مطلوبة ويجب أن تكون 8 أحرف على الأقل'));
+    }
+
     // Check if email already exists
     const existingUser = await User.findOne({ email: ownerEmail });
     if (existingUser) {
@@ -147,7 +151,7 @@ class AdminController {
       name: ownerName,
       email: ownerEmail,
       phone: ownerPhone,
-      password: ownerPassword || '123456',
+      password: ownerPassword,
       role: 'admin', // Tenant Admin/Owner
       tenant: tenant._id,
       isSuperAdmin: false,
@@ -281,6 +285,10 @@ class AdminController {
       if (!tenant) return next(AppError.notFound('المتجر غير موجود'));
     }
 
+    if (!password || password.length < 8) {
+      return next(AppError.badRequest('كلمة المرور مطلوبة ويجب أن تكون 8 أحرف على الأقل'));
+    }
+
     // Check if email already exists
     const existing = await User.findOne({ email });
     if (existing) {
@@ -291,7 +299,7 @@ class AdminController {
       name,
       email,
       phone,
-      password: password || '123456',
+      password,
       role,
       tenant: targetTenantId,
       branch,

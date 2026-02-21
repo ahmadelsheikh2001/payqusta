@@ -5,16 +5,17 @@ import { useThemeStore } from '../store';
 import {
   CreditCard, Calendar, ArrowLeft, ShoppingBag, Receipt, FileText,
   User, Star, Search, ShoppingCart, Heart, Bell,
-  ChevronRight, ArrowRight, Tag, Zap, ShieldCheck, Package, MessageCircle, X
+  ChevronRight, ArrowRight, Tag, Zap, ShieldCheck, Package, MessageCircle, X, Gift
 } from 'lucide-react';
 import { LoadingSpinner } from '../components/UI';
 
 export default function PortalHome() {
-  const { fetchDashboard, loading, customer, addToCart, toggleWishlist, wishlistIds } = usePortalStore();
+  const { fetchDashboard, loading, customer, addToCart, toggleWishlist, wishlistIds, claimDailyReward } = usePortalStore();
   const { dark } = useThemeStore();
   const [data, setData] = useState(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isClaiming, setIsClaiming] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -24,6 +25,17 @@ export default function PortalHome() {
   const loadData = async () => {
     const res = await fetchDashboard();
     if (res) setData(res);
+  };
+
+  const handleClaimReward = async () => {
+    setIsClaiming(true);
+    const res = await claimDailyReward();
+    if (res.success) {
+      import('../components/AnimatedNotification').then(({ notify }) => notify.success(res.message));
+    } else {
+      import('../components/AnimatedNotification').then(({ notify }) => notify.error(res.message));
+    }
+    setIsClaiming(false);
   };
 
   if (loading || !data) {
@@ -85,6 +97,101 @@ export default function PortalHome() {
           </div>
         </div>
       </div>
+
+      {/* ═══════════════ PURCHASING POWER & GAMIFICATION ═══════════════ */}
+      {(customer?.creditLimit > 0 || customer?.points > 0) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+          {/* Purchasing Power */}
+          {customer?.creditLimit > 0 && (
+            <div className="bg-gradient-to-br from-primary-600 to-indigo-800 text-white rounded-3xl p-5 shadow-lg relative overflow-hidden">
+              {/* Background Shapes */}
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-10 -mt-10" />
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-black/20 rounded-full blur-xl -ml-5 -mb-5" />
+
+              <div className="relative z-10 flex justify-between items-start mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center">
+                    <CreditCard className="w-5 h-5 text-white" />
+                  </div>
+                  <h3 className="font-bold">القوة الشرائية المتاحة</h3>
+                </div>
+                <div className="text-left px-2 py-1 bg-black/20 rounded-lg backdrop-blur-sm">
+                  <span className="text-[10px] font-bold text-white/80">الحد الائتماني</span>
+                  <p className="text-xs font-black">{customer.creditLimit.toLocaleString()} {currencyLabel}</p>
+                </div>
+              </div>
+
+              <div className="relative z-10">
+                <h2 className="text-3xl font-black mb-1">
+                  {customer.balance?.toLocaleString() || 0} <span className="text-sm font-normal text-white/80">{currencyLabel}</span>
+                </h2>
+
+                {/* Progress Bar */}
+                <div className="mt-4">
+                  <div className="flex justify-between text-[10px] font-bold text-white/80 mb-1.5">
+                    <span>الرصيد المستخدم: {(customer.outstanding || 0).toLocaleString()}</span>
+                    <span>المتاح: {(customer.balance || 0).toLocaleString()}</span>
+                  </div>
+                  <div className="w-full bg-black/30 h-2 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-green-400 rounded-full transition-all duration-1000 ease-out"
+                      style={{ width: `${Math.min(100, ((customer.balance || 0) / customer.creditLimit) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Gamification / Loyalty Points */}
+          {customer?.points >= 0 && (
+            <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-3xl p-5 shadow-sm relative overflow-hidden flex flex-col justify-center">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-yellow-50 dark:bg-yellow-900/20 rounded-2xl flex items-center justify-center shadow-inner">
+                    <Star className="w-6 h-6 text-yellow-500 fill-yellow-500" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900 dark:text-white">نقاط الولاء</h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      مستواك الحالي: <span className="font-black text-primary-600">{customer.tier === 'vip' ? 'VIP' : customer.tier === 'gold' ? 'ذهبي' : customer.tier === 'silver' ? 'فضي' : 'عادي'}</span>
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleClaimReward}
+                  disabled={isClaiming}
+                  className="bg-yellow-50 hover:bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:hover:bg-yellow-900/50 p-2.5 rounded-xl transition-colors disabled:opacity-50 flex items-center gap-1 shadow-sm"
+                  title="مكافأة الدخول اليومي"
+                >
+                  {isClaiming ? (
+                    <div className="w-4 h-4 border-2 border-yellow-500/30 border-t-yellow-500 rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <Gift className="w-4 h-4" />
+                      <span className="text-[10px] font-bold">مكافأة اليوم</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div>
+                <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-2">
+                  {customer.points.toLocaleString()} <span className="text-sm font-normal text-gray-500">نقطة</span>
+                </h2>
+                <div className="w-full bg-gray-100 dark:bg-gray-700 h-2 rounded-full overflow-hidden mb-1">
+                  <div className="h-full bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-full" style={{ width: `${Math.min(100, (customer.points / 1000) * 100)}%` }}></div>
+                </div>
+                <p className="text-[10px] text-gray-500 text-left">
+                  {customer.points >= 1000 ? 'تم بلوغ الحد الأقصى' : `باقي ${1000 - customer.points} نقطة للمستوى التالي`}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )
+      }
 
       {/* ═══════════════ CATEGORIES ═══════════════ */}
       <div>
@@ -213,137 +320,141 @@ export default function PortalHome() {
       </div>
 
       {/* ═══════════════ UPCOMING PAYMENTS (Mini) ═══════════════ */}
-      {upcomingInstallments?.length > 0 && (
-        <div className="px-1">
-          {(() => {
-            const hasOverdue = upcomingInstallments.some(inst => new Date(inst.dueDate) < new Date());
-            const bgColor = hasOverdue ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800/30' : 'bg-orange-50 dark:bg-orange-900/10 border-orange-100 dark:border-orange-800/30';
-            const iconBg = hasOverdue ? 'bg-red-100 dark:bg-red-800/20 text-red-600' : 'bg-orange-100 dark:bg-orange-800/20 text-orange-600';
+      {
+        upcomingInstallments?.length > 0 && (
+          <div className="px-1">
+            {(() => {
+              const hasOverdue = upcomingInstallments.some(inst => new Date(inst.dueDate) < new Date());
+              const bgColor = hasOverdue ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800/30' : 'bg-orange-50 dark:bg-orange-900/10 border-orange-100 dark:border-orange-800/30';
+              const iconBg = hasOverdue ? 'bg-red-100 dark:bg-red-800/20 text-red-600' : 'bg-orange-100 dark:bg-orange-800/20 text-orange-600';
 
-            return (
-              <div className={`rounded-3xl p-6 border ${bgColor}`}>
-                <div className="flex items-center gap-3 mb-4">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${iconBg}`}>
-                    <Calendar className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className={`font-bold ${hasOverdue ? 'text-red-700 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>
-                      {hasOverdue ? 'أقساط متأخرة الدفع!' : 'تذكير بالدفع'}
-                    </h3>
-                    <p className="text-xs text-gray-500">
-                      {hasOverdue ? 'يرجى سداد الأقساط المتأخرة لتجنب غرامات التأخير' : 'لديك أقساط مستحقة قريباً'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  {upcomingInstallments.slice(0, 2).map((inst, i) => (
-                    <div key={i} className="bg-white dark:bg-gray-800 p-3 rounded-2xl flex items-center justify-between shadow-sm">
-                      <div className="flex items-center gap-3">
-                        <span className="font-bold text-lg text-gray-900 dark:text-white">{new Date(inst.dueDate).getDate()}</span>
-                        <div className="flex flex-col">
-                          <span className="text-xs font-bold">قسط مستحق</span>
-                          <span className="text-[10px] text-gray-500">{new Date(inst.dueDate).toLocaleDateString('ar-EG')}</span>
-                        </div>
-                      </div>
-                      <span className="font-black text-orange-600">{inst.amount.toLocaleString()} {currencyLabel}</span>
+              return (
+                <div className={`rounded-3xl p-6 border ${bgColor}`}>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${iconBg}`}>
+                      <Calendar className="w-5 h-5" />
                     </div>
-                  ))}
+                    <div>
+                      <h3 className={`font-bold ${hasOverdue ? 'text-red-700 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>
+                        {hasOverdue ? 'أقساط متأخرة الدفع!' : 'تذكير بالدفع'}
+                      </h3>
+                      <p className="text-xs text-gray-500">
+                        {hasOverdue ? 'يرجى سداد الأقساط المتأخرة لتجنب غرامات التأخير' : 'لديك أقساط مستحقة قريباً'}
+                      </p>
+                    </div>
+                  </div>
 
-                  <Link to="/portal/invoices" className="block text-center text-xs font-bold text-orange-600 mt-2 hover:underline">
-                    عرض كل الأقساط
-                  </Link>
+                  <div className="space-y-3">
+                    {upcomingInstallments.slice(0, 2).map((inst, i) => (
+                      <div key={i} className="bg-white dark:bg-gray-800 p-3 rounded-2xl flex items-center justify-between shadow-sm">
+                        <div className="flex items-center gap-3">
+                          <span className="font-bold text-lg text-gray-900 dark:text-white">{new Date(inst.dueDate).getDate()}</span>
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold">قسط مستحق</span>
+                            <span className="text-[10px] text-gray-500">{new Date(inst.dueDate).toLocaleDateString('ar-EG')}</span>
+                          </div>
+                        </div>
+                        <span className="font-black text-orange-600">{inst.amount.toLocaleString()} {currencyLabel}</span>
+                      </div>
+                    ))}
+
+                    <Link to="/portal/invoices" className="block text-center text-xs font-bold text-orange-600 mt-2 hover:underline">
+                      عرض كل الأقساط
+                    </Link>
+                  </div>
                 </div>
-              </div>
-            );
-          })()}
-        </div>
-      )}
+              );
+            })()}
+          </div>
+        )
+      }
 
       {/* ═══════════════ SEARCH MODAL ═══════════════ */}
-      {isSearchOpen && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-gray-50 dark:bg-gray-950 animate-fade-in pb-safe">
-          {/* Header */}
-          <div className="bg-white dark:bg-gray-900 px-4 py-3 shadow-sm flex items-center gap-3">
-            <button
-              onClick={() => setIsSearchOpen(false)}
-              className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-300"
-            >
-              <ArrowRight className="w-5 h-5" />
-            </button>
-            <div className="flex-1 relative">
-              <input
-                autoFocus
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="ابحث عن منتجات، أقسام..."
-                className="w-full bg-gray-100 dark:bg-gray-800 border-none rounded-xl py-2.5 pr-10 pl-4 text-sm focus:ring-2 focus:ring-primary-500/50"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && searchQuery.trim()) {
-                    navigate(`/portal/products?q=${encodeURIComponent(searchQuery)}`);
-                    setIsSearchOpen(false);
-                  }
-                }}
-              />
-              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+      {
+        isSearchOpen && (
+          <div className="fixed inset-0 z-50 flex flex-col bg-gray-50 dark:bg-gray-950 animate-fade-in pb-safe">
+            {/* Header */}
+            <div className="bg-white dark:bg-gray-900 px-4 py-3 shadow-sm flex items-center gap-3">
+              <button
+                onClick={() => setIsSearchOpen(false)}
+                className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-300"
+              >
+                <ArrowRight className="w-5 h-5" />
+              </button>
+              <div className="flex-1 relative">
+                <input
+                  autoFocus
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="ابحث عن منتجات، أقسام..."
+                  className="w-full bg-gray-100 dark:bg-gray-800 border-none rounded-xl py-2.5 pr-10 pl-4 text-sm focus:ring-2 focus:ring-primary-500/50"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && searchQuery.trim()) {
+                      navigate(`/portal/products?q=${encodeURIComponent(searchQuery)}`);
+                      setIsSearchOpen(false);
+                    }
+                  }}
+                />
+                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              </div>
+            </div>
+
+            {/* Quick Suggestions */}
+            <div className="flex-1 overflow-y-auto p-4">
+              {!searchQuery ? (
+                <div className="space-y-6">
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-400 mb-3 px-1">عمليات بحث شائعة</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {['عروض', 'جديد', ...categories?.slice(0, 3).map(c => c.name) || []].map((term, i) => (
+                        <button
+                          key={i}
+                          onClick={() => {
+                            navigate(`/portal/products?q=${encodeURIComponent(term)}`);
+                            setIsSearchOpen(false);
+                          }}
+                          className="px-4 py-2 bg-white dark:bg-gray-800 rounded-xl text-sm font-medium border border-gray-100 dark:border-gray-700 shadow-sm"
+                        >
+                          {term}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Visual Category Suggestions */}
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-400 mb-3 px-1">تصفح حسب القسم</h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      {categories?.slice(0, 4).map((cat, i) => (
+                        <button
+                          key={i}
+                          onClick={() => {
+                            navigate(`/portal/products?category=${cat.slug}`);
+                            setIsSearchOpen(false);
+                          }}
+                          className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700"
+                        >
+                          <div className="w-10 h-10 bg-primary-50 dark:bg-primary-900/20 text-primary-500 rounded-lg flex items-center justify-center">
+                            <Tag className="w-5 h-5" />
+                          </div>
+                          <span className="text-sm font-bold text-right flex-1 line-clamp-1">{cat.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-10 opacity-60">
+                  <Search className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                  <p className="text-sm font-medium">اضغط Enter للبحث عن "{searchQuery}"</p>
+                </div>
+              )}
             </div>
           </div>
+        )
+      }
 
-          {/* Quick Suggestions */}
-          <div className="flex-1 overflow-y-auto p-4">
-            {!searchQuery ? (
-              <div className="space-y-6">
-                <div>
-                  <h4 className="text-xs font-bold text-gray-400 mb-3 px-1">عمليات بحث شائعة</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {['عروض', 'جديد', ...categories?.slice(0, 3).map(c => c.name) || []].map((term, i) => (
-                      <button
-                        key={i}
-                        onClick={() => {
-                          navigate(`/portal/products?q=${encodeURIComponent(term)}`);
-                          setIsSearchOpen(false);
-                        }}
-                        className="px-4 py-2 bg-white dark:bg-gray-800 rounded-xl text-sm font-medium border border-gray-100 dark:border-gray-700 shadow-sm"
-                      >
-                        {term}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Visual Category Suggestions */}
-                <div>
-                  <h4 className="text-xs font-bold text-gray-400 mb-3 px-1">تصفح حسب القسم</h4>
-                  <div className="grid grid-cols-2 gap-2">
-                    {categories?.slice(0, 4).map((cat, i) => (
-                      <button
-                        key={i}
-                        onClick={() => {
-                          navigate(`/portal/products?category=${cat.slug}`);
-                          setIsSearchOpen(false);
-                        }}
-                        className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700"
-                      >
-                        <div className="w-10 h-10 bg-primary-50 dark:bg-primary-900/20 text-primary-500 rounded-lg flex items-center justify-center">
-                          <Tag className="w-5 h-5" />
-                        </div>
-                        <span className="text-sm font-bold text-right flex-1 line-clamp-1">{cat.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-10 opacity-60">
-                <Search className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-                <p className="text-sm font-medium">اضغط Enter للبحث عن "{searchQuery}"</p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-    </div>
+    </div >
   );
 }

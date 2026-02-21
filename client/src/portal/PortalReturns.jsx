@@ -2,10 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { usePortalStore } from '../store/portalStore';
 import { useThemeStore } from '../store';
 import { RefreshCcw, CheckCircle, Clock, XCircle, ChevronLeft, Package, AlertCircle } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import PortalEmptyState from './components/PortalEmptyState';
+import PortalSkeleton from './components/PortalSkeleton';
 
 export default function PortalReturns() {
     const { fetchReturnRequests, loading } = usePortalStore();
+    const navigate = useNavigate();
     const { dark } = useThemeStore();
     const [requests, setRequests] = useState([]);
 
@@ -42,19 +45,16 @@ export default function PortalReturns() {
             </div>
 
             {loading && requests.length === 0 ? (
-                <div className="flex justify-center py-16">
-                    <div className="w-10 h-10 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
-                </div>
+                <PortalSkeleton count={3} type="list" className="mt-4" />
             ) : requests.length === 0 ? (
-                <div className="text-center py-16 bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
-                    <div className="w-16 h-16 bg-gray-50 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <RefreshCcw className="w-8 h-8 text-gray-400" />
-                    </div>
-                    <p className="text-gray-500 dark:text-gray-400 font-medium">لا توجد طلبات إرجاع سابقة</p>
-                    <Link to="/portal/invoices" className="inline-block mt-4 px-6 py-2 bg-primary-500 text-white rounded-xl font-bold text-sm hover:bg-primary-600 transition">
-                        استعراض الفواتير
-                    </Link>
-                </div>
+                <PortalEmptyState
+                    icon={RefreshCcw}
+                    title="لا توجد طلبات إرجاع سابقة"
+                    message="يمكنك تقديم طلب إرجاع من صفحة الفواتير."
+                    actionText="استعراض الفواتير"
+                    onAction={() => navigate('/portal/invoices')}
+                    className="my-8"
+                />
             ) : (
                 <div className="space-y-4">
                     {requests.map((req) => {

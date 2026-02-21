@@ -4,6 +4,8 @@ import { useThemeStore } from '../store';
 import { TrendingUp, TrendingDown, Gift, ShoppingCart, Award, Calendar, Filter } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import PortalEmptyState from './components/PortalEmptyState';
+import PortalSkeleton from './components/PortalSkeleton';
 
 export default function PortalPointsHistory() {
   const { fetchPointsHistory, fetchPoints, customer } = usePortalStore();
@@ -123,8 +125,8 @@ export default function PortalPointsHistory() {
           <button
             onClick={() => setFilter('all')}
             className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${filter === 'all'
-                ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/30'
-                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+              ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/30'
+              : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
               }`}
           >
             الكل
@@ -132,8 +134,8 @@ export default function PortalPointsHistory() {
           <button
             onClick={() => setFilter('earned')}
             className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${filter === 'earned'
-                ? 'bg-green-600 text-white shadow-lg shadow-green-500/30'
-                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+              ? 'bg-green-600 text-white shadow-lg shadow-green-500/30'
+              : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
               }`}
           >
             مكتسبة
@@ -141,8 +143,8 @@ export default function PortalPointsHistory() {
           <button
             onClick={() => setFilter('redeemed')}
             className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${filter === 'redeemed'
-                ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/30'
-                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+              ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/30'
+              : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
               }`}
           >
             مستبدلة
@@ -152,9 +154,8 @@ export default function PortalPointsHistory() {
         {/* History List */}
         <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
           {loading ? (
-            <div className="py-20 flex flex-col items-center justify-center">
-              <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-              <p className="text-gray-500 dark:text-gray-400">جاري التحميل...</p>
+            <div className="p-4">
+              <PortalSkeleton count={4} type="list" />
             </div>
           ) : filteredHistory.length > 0 ? (
             <div className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -166,8 +167,8 @@ export default function PortalPointsHistory() {
                   <div className="flex items-center gap-4">
                     {/* Icon */}
                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${item.type === 'earn'
-                        ? 'bg-green-50 dark:bg-green-900/20'
-                        : 'bg-purple-50 dark:bg-purple-900/20'
+                      ? 'bg-green-50 dark:bg-green-900/20'
+                      : 'bg-purple-50 dark:bg-purple-900/20'
                       }`}>
                       {getIcon(item.type)}
                     </div>
@@ -186,8 +187,8 @@ export default function PortalPointsHistory() {
                           )}
                         </div>
                         <div className={`text-xl font-black shrink-0 ${item.type === 'earn'
-                            ? 'text-green-600 dark:text-green-400'
-                            : 'text-purple-600 dark:text-purple-400'
+                          ? 'text-green-600 dark:text-green-400'
+                          : 'text-purple-600 dark:text-purple-400'
                           }`}>
                           {item.type === 'earn' ? '+' : '-'}{item.points}
                         </div>
@@ -200,8 +201,8 @@ export default function PortalPointsHistory() {
                             : 'غير متوفر'}
                         </div>
                         <span className={`px-2 py-0.5 rounded-full ${item.type === 'earn'
-                            ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-                            : 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400'
+                          ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                          : 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400'
                           }`}>
                           {getTypeLabel(item.type)}
                         </span>
@@ -212,21 +213,18 @@ export default function PortalPointsHistory() {
               ))}
             </div>
           ) : (
-            <div className="py-20 flex flex-col items-center justify-center text-center">
-              <div className="w-20 h-20 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
-                <Award className="w-10 h-10 text-gray-400" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-700 dark:text-gray-300 mb-2">
-                لا توجد سجلات
-              </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm">
-                {filter === 'all'
+            <PortalEmptyState
+              icon={Award}
+              title="لا توجد سجلات"
+              message={
+                filter === 'all'
                   ? 'لم تقم بأي نشاط يتعلق بالنقاط حتى الآن'
                   : filter === 'earned'
                     ? 'لم تكسب أي نقاط حتى الآن'
-                    : 'لم تستبدل أي نقاط حتى الآن'}
-              </p>
-            </div>
+                    : 'لم تستبدل أي نقاط حتى الآن'
+              }
+              className="my-8 border-none"
+            />
           )}
         </div>
 

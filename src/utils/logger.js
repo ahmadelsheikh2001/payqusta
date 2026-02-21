@@ -15,11 +15,51 @@ if (!fs.existsSync(logsDir)) {
 
 const isProduction = process.env.NODE_ENV === 'production';
 
+// Sensitive fields to redact
+const SENSITIVE_FIELDS = ['password', 'token', 'refreshToken', 'creditCard', 'cvv', 'secret'];
+
+const redactSensitive = winston.format((info) => {
+  const redact = (obj) => {
+    if (!obj || typeof obj !== 'object') return obj;
+    // Handle arrays
+    if (Array.isArray(obj)) return obj.map(redact);
+
+    // Handle objects
+    const result = { ...obj };
+    for (const key of Object.keys(result)) {
+      if (SENSITIVE_FIELDS.some(field => key.toLowerCase().includes(field.toLowerCase()))) {
+        result[key] = '[REDACTED]';
+      } else if (typeof result[key] === 'object') {
+        result[key] = redact(result[key]);
+      }
+    }
+    return result;
+  };
+
+  // Redact the message if it's an object/JSON
+  if (info.message && typeof info.message === 'object') {
+    info.message = JSON.stringify(redact(info.message));
+  } else if (typeof info.message === 'string') {
+    // Simple string replace for passwords/tokens in query/body strings can be added here if needed, 
+    // but usually sensitive info comes in meta objects
+  }
+
+  // Redact other meta properties
+  for (const key of Object.keys(info)) {
+    if (key !== 'level' && key !== 'message' && key !== 'timestamp' && key !== 'stack') {
+      info[key] = redact(info[key]);
+    }
+  }
+
+  return info;
+});
+
 const logFormat = winston.format.combine(
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
   winston.format.errors({ stack: true }),
-  winston.format.printf(({ timestamp, level, message, stack, tenant, user }) => {
-    const ctx = [tenant && `T:${tenant}`, user && `U:${user}`].filter(Boolean).join(' ');
+  redactSensitive(),
+  winston.format.printf(({ timestamp, level, message, stack, tenant, user, requestId }) => {
+    const ctx = [tenant && `T:${tenant}`, user && `U:${user}`, requestId && `Req:${requestId}`].filter(Boolean).join(' ');
     return `[${timestamp}] ${level.toUpperCase()}${ctx ? ` [${ctx}]` : ''}: ${stack || message}`;
   })
 );
@@ -28,6 +68,7 @@ const logFormat = winston.format.combine(
 const jsonFormat = winston.format.combine(
   winston.format.timestamp(),
   winston.format.errors({ stack: true }),
+  redactSensitive(),
   winston.format.json()
 );
 
@@ -82,6 +123,7 @@ logger.apiError = (err, req) => {
     url: req?.originalUrl,
     tenant: req?.tenantId?.toString(),
     user: req?.user?._id?.toString(),
+    requestId: req?.requestId || req?.headers?.['x-request-id'],
     ip: req?.ip,
   });
 };

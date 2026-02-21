@@ -43,6 +43,9 @@ const errorHandler = (err, req, res, next) => {
     path: req.path,
     method: req.method,
     stack: err.stack,
+    requestId: req.requestId,
+    tenantId: req.tenantId,
+    userId: req.user?._id
   });
 
   // Mongoose bad ObjectId
@@ -64,6 +67,7 @@ const errorHandler = (err, req, res, next) => {
   res.status(statusCode).json({
     success: false,
     message,
+    requestId: req.requestId,
     ...(process.env.NODE_ENV === 'development' && {
       error: err.message,
       stack: err.stack,

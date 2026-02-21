@@ -199,3 +199,26 @@ export function LoadingSpinner({ text = 'جاري التحميل...' }) {
     </div>
   );
 }
+
+// ========== OWNER TABLE SKELETON ==========
+export function OwnerTableSkeleton({ rows = 8, columns = 6 }) {
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
+      <div className="p-4 border-b border-gray-100 dark:border-gray-800">
+        <div className="h-4 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+      </div>
+      <div className="p-4 space-y-3">
+        {Array.from({ length: rows }).map((_, rowIdx) => (
+          <div key={rowIdx} className="grid gap-3" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
+            {Array.from({ length: columns }).map((__, colIdx) => (
+              <div
+                key={`${rowIdx}-${colIdx}`}
+                className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

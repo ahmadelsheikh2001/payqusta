@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { CheckCircle, Package, Phone, MapPin, Calendar } from 'lucide-react';
-import axios from 'axios';
+import { api } from '../store';
 import { Card, Button, Badge, LoadingSpinner } from '../components/UI';
 
 export default function OrderConfirmation() {
@@ -17,7 +17,7 @@ export default function OrderConfirmation() {
   const loadOrder = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`/api/v1/invoices/${id}`);
+      const res = await api.get(`/invoices/${id}`);
       setOrder(res.data.data);
     } catch (err) {
       console.error('Failed to load order:', err);

@@ -915,7 +915,7 @@ class PortalController {
       _id: id,
       tenant: tenantId,
       isActive: true
-    }).select('-costPrice -supplier'); // Exclude sensitive fields
+    }).select('-cost -supplier'); // Exclude sensitive fields
 
     if (!product) {
       return next(AppError.notFound('المنتج غير موجود'));
@@ -928,7 +928,7 @@ class PortalController {
    * POST /api/v1/portal/cart/checkout
    */
   checkout = catchAsync(async (req, res, next) => {
-    const { items, shippingAddress, notes, signature } = req.body;
+    const { items, shippingAddress, notes, signature, couponCode } = req.body;
     const customer = await Customer.findById(req.user.id).populate('tenant', 'settings');
 
     if (customer.salesBlocked) {
@@ -973,10 +973,61 @@ class PortalController {
       productUpdates.push({ product, qty });
     }
 
+    let finalTotalAmount = totalAmount;
+    let appliedCoupon = null;
+    let discountAmount = 0;
+
+    if (couponCode) {
+      const Coupon = require('../models/Coupon');
+      const coupon = await Coupon.findOne({ tenant: customer.tenant._id || customer.tenant, code: couponCode.toUpperCase().trim() });
+
+      const validity = coupon ? coupon.isValid() : { valid: false };
+      if (!coupon || !validity.valid) {
+        return next(AppError.badRequest(validity.reason || 'كود الخصم غير صالح أو منتهي الصلاحية'));
+      }
+      if (totalAmount < coupon.minOrderAmount) {
+        return next(AppError.badRequest(`الحد الأدنى للطلب لاستخدام هذا الكوبون هو ${coupon.minOrderAmount} ج.م`));
+      }
+
+      const isCustomerAllowed = coupon.applicableCustomers.length === 0 || coupon.applicableCustomers.some(id => id.toString() === customer._id.toString());
+      if (!isCustomerAllowed) {
+        return next(AppError.badRequest('غير مصرح لك باستخدام كود الخصم هذا'));
+      }
+
+      const customerUsages = coupon.usages.filter(u => u.customer?.toString() === customer._id.toString()).length;
+      if (customerUsages >= (coupon.usagePerCustomer || 1)) {
+        return next(AppError.badRequest('لقد تجاوزت الحد المسموح لاستخدام هذا الكوبون'));
+      }
+
+      // Check overall usage limit directly with atomic update
+      const query = { _id: coupon._id };
+      if (coupon.usageLimit) {
+        query.usageCount = { $lt: coupon.usageLimit };
+      }
+
+      const updatedCoupon = await Coupon.findOneAndUpdate(
+        query,
+        { $inc: { usageCount: 1 } },
+        { new: true }
+      );
+
+      if (!updatedCoupon && coupon.usageLimit) {
+        return next(AppError.badRequest('تم الوصول للحد الأقصى لاستخدام كود الخصم. يرجى إزالة الكوبون للمتابعة.'));
+      }
+
+      appliedCoupon = updatedCoupon || coupon;
+      discountAmount = appliedCoupon.calculateDiscount(totalAmount);
+      finalTotalAmount = Math.max(0, totalAmount - discountAmount);
+    }
+
     // Check Credit Limit
     const availableCredit = customer.financials.creditLimit - customer.financials.outstandingBalance;
-    if (totalAmount > availableCredit) {
-      return next(AppError.badRequest(`الرصيد المتاح (${availableCredit.toLocaleString()}) لا يكفي لإتمام الطلب (${totalAmount.toLocaleString()})`));
+    if (finalTotalAmount > availableCredit) {
+      if (appliedCoupon) {
+        const Coupon = require('../models/Coupon');
+        await Coupon.findByIdAndUpdate(appliedCoupon._id, { $inc: { usageCount: -1 } });
+      }
+      return next(AppError.badRequest(`الرصيد المتاح (${availableCredit.toLocaleString()}) لا يكفي لإتمام الطلب (${finalTotalAmount.toLocaleString()})`));
     }
 
     // Installment plan
@@ -984,7 +1035,7 @@ class PortalController {
     const months = installmentSettings.defaultMonths || 6;
 
     const installments = [];
-    const monthlyAmount = Math.ceil(totalAmount / months);
+    const monthlyAmount = Math.ceil(finalTotalAmount / months);
     const today = new Date();
 
     for (let i = 1; i <= months; i++) {
@@ -993,7 +1044,7 @@ class PortalController {
       installments.push({
         installmentNumber: i,
         dueDate: date,
-        amount: i === months ? totalAmount - (monthlyAmount * (months - 1)) : monthlyAmount,
+        amount: i === months ? finalTotalAmount - (monthlyAmount * (months - 1)) : monthlyAmount,
         status: 'pending'
       });
     }
@@ -1008,9 +1059,10 @@ class PortalController {
       customer: customer._id,
       items: invoiceItems,
       subtotal: totalAmount,
-      totalAmount,
+      discount: discountAmount,
+      totalAmount: finalTotalAmount,
       paidAmount: 0,
-      remainingAmount: totalAmount,
+      remainingAmount: finalTotalAmount,
       status: 'pending',
       orderStatus: 'pending',
       paymentMethod: 'deferred',
@@ -1030,6 +1082,13 @@ class PortalController {
       orderStatusHistory: [{ status: 'pending', note: 'تم استلام الطلب من البوابة الإلكترونية' }],
     });
 
+    if (appliedCoupon) {
+      const Coupon = require('../models/Coupon');
+      await Coupon.findByIdAndUpdate(appliedCoupon._id, {
+        $push: { usages: { customer: customer._id, invoice: invoice._id, discountAmount, usedAt: new Date() } }
+      });
+    }
+
     // Update Stock
     for (const update of productUpdates) {
       await Product.findByIdAndUpdate(update.product._id, { $inc: { 'stock.quantity': -update.qty } });
@@ -1037,10 +1096,10 @@ class PortalController {
 
     // Update Customer Balance
     if (typeof customer.recordPurchase === 'function') {
-      customer.recordPurchase(totalAmount);
+      customer.recordPurchase(finalTotalAmount);
     } else {
-      customer.financials.totalPurchases += totalAmount;
-      customer.financials.outstandingBalance += totalAmount;
+      customer.financials.totalPurchases += finalTotalAmount;
+      customer.financials.outstandingBalance += finalTotalAmount;
     }
     await customer.save();
 
@@ -1051,7 +1110,7 @@ class PortalController {
         tenant: customer.tenant._id || customer.tenant,
         type: 'order',
         title: 'طلب جديد من البوابة',
-        message: `طلب جديد رقم #${invoice.invoiceNumber} بقيمة ${totalAmount.toLocaleString()} من العميل ${customer.name}`,
+        message: `طلب جديد رقم #${invoice.invoiceNumber} بقيمة ${finalTotalAmount.toLocaleString()} من العميل ${customer.name}`,
         data: {
           invoiceId: invoice._id,
           customerId: customer._id,
@@ -1070,7 +1129,7 @@ class PortalController {
         customerRecipient: customer._id,
         type: 'order',
         title: 'تم استلام طلبك',
-        message: `طلبك رقم #${invoice.invoiceNumber} بقيمة ${totalAmount.toLocaleString()} ج.م قيد المراجعة`,
+        message: `طلبك رقم #${invoice.invoiceNumber} بقيمة ${finalTotalAmount.toLocaleString()} ج.م قيد المراجعة`,
         icon: 'shopping-bag',
         color: 'success',
         link: `/portal/orders/${invoice._id}`
@@ -1080,7 +1139,7 @@ class PortalController {
     ApiResponse.created(res, {
       orderId: invoice._id,
       invoiceNumber: invoice.invoiceNumber,
-      totalAmount,
+      totalAmount: finalTotalAmount,
       installments: installments.length,
       monthlyAmount,
     }, 'تم استلام طلبك بنجاح');
@@ -1787,6 +1846,57 @@ class PortalController {
       total,
       pages: Math.ceil(total / parseInt(limit)),
     });
+  });
+
+  // ──────────────────────────────────────────
+  // Gamification (Portal)
+  // ──────────────────────────────────────────
+
+  /**
+   * POST /api/v1/portal/gamification/daily-reward
+   * Claim daily login reward points
+   */
+  claimDailyReward = catchAsync(async (req, res, next) => {
+    const Customer = require('../models/Customer');
+    const customer = await Customer.findById(req.user.id);
+
+    if (!customer) return next(AppError.notFound('العميل غير موجود'));
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const lastClaim = customer.lastDailyRewardClaim ? new Date(customer.lastDailyRewardClaim) : null;
+    if (lastClaim) {
+      lastClaim.setHours(0, 0, 0, 0);
+      if (lastClaim.getTime() === today.getTime()) {
+        return next(AppError.badRequest('لقد قمت بجمع مكافأتك اليومية بالفعل'));
+      }
+    }
+
+    // Award 50 points daily
+    const pointsToAward = 50;
+    customer.addPoints(pointsToAward);
+    customer.lastDailyRewardClaim = new Date();
+    await customer.save({ validateBeforeSave: false });
+
+    // Optional: add a notification
+    const Notification = require('../models/Notification');
+    await Notification.create({
+      tenant: customer.tenant,
+      customerRecipient: customer._id,
+      type: 'promotion',
+      title: 'مكافأة الدخول اليومي',
+      message: `مبروك! لقد حصلت على ${pointsToAward} نقطة لزيارتك المتجر اليوم.`,
+      icon: 'star',
+      color: 'success',
+      link: '/portal'
+    });
+
+    ApiResponse.success(res, {
+      points: customer.gamification?.points,
+      tier: customer.tier,
+      reward: pointsToAward
+    }, `تم إضافة ${pointsToAward} نقطة لمحفظتك بنجاح!`);
   });
 }
 

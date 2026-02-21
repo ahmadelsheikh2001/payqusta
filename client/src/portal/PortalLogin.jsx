@@ -146,18 +146,18 @@ export default function PortalLogin() {
           {activeTab === 'login' && (
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">رقم الهاتف</label>
+                <label htmlFor="portal-login-phone" className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">رقم الهاتف</label>
                 <div className="relative">
                   <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} placeholder="01xxxxxxxxx" required />
+                  <input id="portal-login-phone" name="phone" autoComplete="tel" type="text" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} placeholder="01xxxxxxxxx" required />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">كلمة المرور</label>
+                <label htmlFor="portal-login-password" className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">كلمة المرور</label>
                 <div className="relative">
                   <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input type={showPass ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} className={`${inputClass} pl-11`} placeholder="••••••" required minLength={6} />
+                  <input id="portal-login-password" name="password" autoComplete="current-password" type={showPass ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} className={`${inputClass} pl-11`} placeholder="••••••" required minLength={6} />
                   <button type="button" onClick={() => setShowPass(!showPass)} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                     {showPass ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
@@ -165,10 +165,10 @@ export default function PortalLogin() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">كود المتجر</label>
+                <label htmlFor="portal-login-store-code" className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">كود المتجر</label>
                 <div className="relative">
                   <Store className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input type="text" value={storeCode} onChange={(e) => setStoreCode(e.target.value)} className={inputClass} placeholder="مثال: my-store" required />
+                  <input id="portal-login-store-code" name="storeCode" autoComplete="organization" type="text" value={storeCode} onChange={(e) => setStoreCode(e.target.value)} className={inputClass} placeholder="مثال: my-store" required />
                 </div>
               </div>
 
@@ -187,26 +187,26 @@ export default function PortalLogin() {
           {activeTab === 'register' && (
             <form onSubmit={handleRegister} className="space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">الاسم الكامل</label>
+                <label htmlFor="portal-register-name" className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">الاسم الكامل</label>
                 <div className="relative">
                   <User className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input type="text" value={regName} onChange={(e) => setRegName(e.target.value)} className={inputClass} placeholder="مثال: محمد أحمد" required />
+                  <input id="portal-register-name" name="name" autoComplete="name" type="text" value={regName} onChange={(e) => setRegName(e.target.value)} className={inputClass} placeholder="مثال: محمد أحمد" required />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">رقم الهاتف</label>
+                <label htmlFor="portal-register-phone" className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">رقم الهاتف</label>
                 <div className="relative">
                   <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input type="text" value={regPhone} onChange={(e) => setRegPhone(e.target.value)} className={inputClass} placeholder="01xxxxxxxxx" required />
+                  <input id="portal-register-phone" name="phone" autoComplete="tel" type="text" value={regPhone} onChange={(e) => setRegPhone(e.target.value)} className={inputClass} placeholder="01xxxxxxxxx" required />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">كلمة المرور</label>
+                <label htmlFor="portal-register-password" className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">كلمة المرور</label>
                 <div className="relative">
                   <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input type={showPass ? 'text' : 'password'} value={regPassword} onChange={(e) => setRegPassword(e.target.value)} className={`${inputClass} pl-11`} placeholder="6 أحرف على الأقل" required minLength={6} />
+                  <input id="portal-register-password" name="password" autoComplete="new-password" type={showPass ? 'text' : 'password'} value={regPassword} onChange={(e) => setRegPassword(e.target.value)} className={`${inputClass} pl-11`} placeholder="6 أحرف على الأقل" required minLength={6} />
                   <button type="button" onClick={() => setShowPass(!showPass)} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                     {showPass ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
@@ -214,10 +214,10 @@ export default function PortalLogin() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">تأكيد كلمة المرور</label>
+                <label htmlFor="portal-register-confirm-password" className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">تأكيد كلمة المرور</label>
                 <div className="relative">
                   <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input type={showConfirmPass ? 'text' : 'password'} value={regConfirmPassword} onChange={(e) => setRegConfirmPassword(e.target.value)} className={`${inputClass} pl-11`} placeholder="أعد كتابة كلمة المرور" required minLength={6} />
+                  <input id="portal-register-confirm-password" name="confirmPassword" autoComplete="new-password" type={showConfirmPass ? 'text' : 'password'} value={regConfirmPassword} onChange={(e) => setRegConfirmPassword(e.target.value)} className={`${inputClass} pl-11`} placeholder="أعد كتابة كلمة المرور" required minLength={6} />
                   <button type="button" onClick={() => setShowConfirmPass(!showConfirmPass)} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                     {showConfirmPass ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
@@ -225,10 +225,10 @@ export default function PortalLogin() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">كود المتجر</label>
+                <label htmlFor="portal-register-store-code" className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">كود المتجر</label>
                 <div className="relative">
                   <Store className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input type="text" value={regStoreCode} onChange={(e) => setRegStoreCode(e.target.value)} className={inputClass} placeholder="اطلبه من البائع" required />
+                  <input id="portal-register-store-code" name="storeCode" autoComplete="organization" type="text" value={regStoreCode} onChange={(e) => setRegStoreCode(e.target.value)} className={inputClass} placeholder="اطلبه من البائع" required />
                 </div>
               </div>
 
@@ -253,18 +253,18 @@ export default function PortalLogin() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">رقم الهاتف المسجل</label>
+                <label htmlFor="portal-activate-phone" className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">رقم الهاتف المسجل</label>
                 <div className="relative">
                   <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input type="text" value={actPhone} onChange={(e) => setActPhone(e.target.value)} className={inputClass} placeholder="الرقم المسجل لدى البائع" required />
+                  <input id="portal-activate-phone" name="phone" autoComplete="tel" type="text" value={actPhone} onChange={(e) => setActPhone(e.target.value)} className={inputClass} placeholder="الرقم المسجل لدى البائع" required />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">كلمة مرور جديدة</label>
+                <label htmlFor="portal-activate-password" className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">كلمة مرور جديدة</label>
                 <div className="relative">
                   <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input type={showPass ? 'text' : 'password'} value={actPassword} onChange={(e) => setActPassword(e.target.value)} className={`${inputClass} pl-11`} placeholder="6 أحرف على الأقل" required minLength={6} />
+                  <input id="portal-activate-password" name="newPassword" autoComplete="new-password" type={showPass ? 'text' : 'password'} value={actPassword} onChange={(e) => setActPassword(e.target.value)} className={`${inputClass} pl-11`} placeholder="6 أحرف على الأقل" required minLength={6} />
                   <button type="button" onClick={() => setShowPass(!showPass)} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                     {showPass ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
@@ -272,10 +272,10 @@ export default function PortalLogin() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">تأكيد كلمة المرور</label>
+                <label htmlFor="portal-activate-confirm-password" className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">تأكيد كلمة المرور</label>
                 <div className="relative">
                   <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input type={showConfirmPass ? 'text' : 'password'} value={actConfirmPassword} onChange={(e) => setActConfirmPassword(e.target.value)} className={`${inputClass} pl-11`} placeholder="أعد كتابة كلمة المرور" required minLength={6} />
+                  <input id="portal-activate-confirm-password" name="confirmPassword" autoComplete="new-password" type={showConfirmPass ? 'text' : 'password'} value={actConfirmPassword} onChange={(e) => setActConfirmPassword(e.target.value)} className={`${inputClass} pl-11`} placeholder="أعد كتابة كلمة المرور" required minLength={6} />
                   <button type="button" onClick={() => setShowConfirmPass(!showConfirmPass)} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                     {showConfirmPass ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
@@ -283,10 +283,10 @@ export default function PortalLogin() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">كود المتجر</label>
+                <label htmlFor="portal-activate-store-code" className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">كود المتجر</label>
                 <div className="relative">
                   <Store className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input type="text" value={actStoreCode} onChange={(e) => setActStoreCode(e.target.value)} className={inputClass} placeholder="اطلبه من البائع" required />
+                  <input id="portal-activate-store-code" name="storeCode" autoComplete="organization" type="text" value={actStoreCode} onChange={(e) => setActStoreCode(e.target.value)} className={inputClass} placeholder="اطلبه من البائع" required />
                 </div>
               </div>
 

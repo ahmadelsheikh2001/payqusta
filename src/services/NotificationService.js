@@ -78,23 +78,35 @@ class NotificationService {
    * Notify all admins and the vendor of a tenant
    * This ensures that store managers and owners both see important alerts
    */
-  async notifyTenantAdmins(tenantId, { type, title, message, icon, color, link, relatedModel, relatedId }) {
+  async notifyTenantAdmins(tenantId, payload, options = {}) {
+    const { targetBranchId = null, roles = ['admin', 'vendor'] } = options;
     try {
-      // Find all users with role 'admin' or 'vendor' in this tenant
-      // Also potentially 'manager' if that role exists, but for now 'admin' and 'vendor' are key
+      // Find all users with requested roles in this tenant
       const recipients = await User.find({
         tenant: tenantId,
-        role: { $in: ['vendor', 'admin'] },
+        role: { $in: roles },
         isActive: true
-      }).select('_id');
+      }).select('_id role branch');
 
       if (!recipients.length) return;
 
-      const notifications = recipients.map(user => 
+      const validRecipients = recipients.filter(user => {
+        // Admin sees everything
+        if (user.role === 'admin') return true;
+
+        // For vendors, verify branch restriction if specified
+        if (user.role === 'vendor' && targetBranchId) {
+          return user.branch && user.branch.toString() === targetBranchId.toString();
+        }
+
+        return true;
+      });
+
+      const notifications = validRecipients.map(user =>
         this.send({
           tenant: tenantId,
           recipient: user._id,
-          type, title, message, icon, color, link, relatedModel, relatedId,
+          ...payload
         })
       );
 
@@ -105,10 +117,10 @@ class NotificationService {
   }
 
   /**
-   * Legacy wrapper for backward compatibility, now uses notifyTenantAdmins
+   * Legacy wrapper for backward compatibility
    */
-  async notifyVendor(tenantId, payload) {
-    return this.notifyTenantAdmins(tenantId, payload);
+  async notifyVendor(tenantId, payload, options = {}) {
+    return this.notifyTenantAdmins(tenantId, payload, options);
   }
 
   // ============ SPECIFIC NOTIFICATION METHODS ============
@@ -127,7 +139,7 @@ class NotificationService {
       link: '/invoices',
       relatedModel: 'Invoice',
       relatedId: invoice._id,
-    });
+    }, { targetBranchId: invoice.branch });
   }
 
   /**
@@ -144,13 +156,13 @@ class NotificationService {
       link: '/invoices',
       relatedModel: 'Invoice',
       relatedId: invoice._id,
-    });
+    }, { targetBranchId: invoice.branch });
   }
 
   /**
    * Installment due tomorrow
    */
-  async onInstallmentDue(tenantId, customerName, invoiceNumber, amount, dueDate) {
+  async onInstallmentDue(tenantId, customerName, invoiceNumber, amount, dueDate, branchId = null) {
     const fmt = (n) => (n || 0).toLocaleString('ar-EG');
     const dateStr = new Date(dueDate).toLocaleDateString('ar-EG');
     return this.notifyTenantAdmins(tenantId, {
@@ -160,13 +172,13 @@ class NotificationService {
       icon: 'clock',
       color: 'warning',
       link: '/invoices',
-    });
+    }, { roles: branchId ? ['admin', 'vendor'] : ['admin'], targetBranchId: branchId });
   }
 
   /**
    * Installment overdue
    */
-  async onInstallmentOverdue(tenantId, customerName, invoiceNumber, amount) {
+  async onInstallmentOverdue(tenantId, customerName, invoiceNumber, amount, branchId = null) {
     const fmt = (n) => (n || 0).toLocaleString('ar-EG');
     return this.notifyTenantAdmins(tenantId, {
       type: 'installment_overdue',
@@ -175,7 +187,7 @@ class NotificationService {
       icon: 'alert-triangle',
       color: 'danger',
       link: '/invoices',
-    });
+    }, { roles: branchId ? ['admin', 'vendor'] : ['admin'], targetBranchId: branchId });
   }
 
   /**
@@ -222,7 +234,7 @@ class NotificationService {
       icon: 'truck',
       color: 'warning',
       link: '/suppliers',
-    });
+    }, { roles: ['admin'] });
   }
 
   /**
@@ -256,7 +268,7 @@ class NotificationService {
   /**
    * Expense created
    */
-  async onExpenseCreated(tenantId, { title, amount, category, createdByName }) {
+  async onExpenseCreated(tenantId, { title, amount, category, createdByName, branchId }) {
     const fmt = (n) => (n || 0).toLocaleString('ar-EG');
     return this.notifyTenantAdmins(tenantId, {
       type: 'expense_created',
@@ -265,7 +277,7 @@ class NotificationService {
       icon: 'credit-card',
       color: 'gray',
       link: '/expenses',
-    });
+    }, { roles: branchId ? ['admin', 'vendor'] : ['admin'], targetBranchId: branchId });
   }
 
   /**
@@ -279,7 +291,7 @@ class NotificationService {
       icon: 'store', // Lucide icon name, might need mapping in frontend but 'store' is standard or mapped to something similar
       color: 'success',
       link: '/settings', // Or dashboard
-    });
+    }, { roles: ['admin'] });
   }
 }
 

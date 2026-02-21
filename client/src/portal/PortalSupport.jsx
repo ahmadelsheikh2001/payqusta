@@ -3,6 +3,8 @@ import { usePortalStore } from '../store/portalStore';
 import { MessageCircle, Phone, Mail, Send, HelpCircle, Package, CreditCard, AlertTriangle, FileText, Clock, CheckCircle2, ChevronLeft } from 'lucide-react';
 import { notify } from '../components/AnimatedNotification';
 import { Link } from 'react-router-dom';
+import PortalEmptyState from './components/PortalEmptyState';
+import PortalSkeleton from './components/PortalSkeleton';
 
 const issueTypes = [
     { value: 'inquiry', label: 'استفسار عام', icon: HelpCircle },
@@ -111,8 +113,8 @@ export default function PortalSupport() {
                 <button
                     onClick={() => setActiveTab('new')}
                     className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-bold transition-all ${activeTab === 'new'
-                            ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                        ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                         }`}
                 >
                     رسالة جديدة
@@ -120,8 +122,8 @@ export default function PortalSupport() {
                 <button
                     onClick={() => setActiveTab('tickets')}
                     className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-bold transition-all ${activeTab === 'tickets'
-                            ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                        ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                         }`}
                 >
                     تذاكري السابقة
@@ -193,17 +195,16 @@ export default function PortalSupport() {
             ) : (
                 <div className="space-y-4">
                     {loadingTickets ? (
-                        <div className="flex justify-center py-10">
-                            <span className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
+                        <div className="pt-8">
+                            <PortalSkeleton count={3} type="list" />
                         </div>
                     ) : tickets.length === 0 ? (
-                        <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700">
-                            <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                <FileText className="w-8 h-8 text-gray-400" />
-                            </div>
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">لا توجد رسائل سابقة</h3>
-                            <p className="text-gray-500 dark:text-gray-400">أي رسالة ترسلها للدعم الفني ستظهر هنا لتتمكن من متابعة الردود عليها.</p>
-                        </div>
+                        <PortalEmptyState
+                            icon={FileText}
+                            title="لا توجد رسائل سابقة"
+                            message="أي رسالة ترسلها للدعم الفني ستظهر هنا لتتمكن من متابعة الردود عليها."
+                            className="my-8"
+                        />
                     ) : (
                         tickets.map(ticket => {
                             const StatusInfo = getStatusInfo(ticket.status);

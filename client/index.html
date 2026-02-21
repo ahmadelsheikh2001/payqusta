@@ -17,7 +17,7 @@
     
     <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.json">
-    <link rel="apple-touch-icon" href="/icon-192.png">
+    <link rel="apple-touch-icon" href="/favicon.svg">
   </head>
   <body>
     <div id="root">
@@ -73,20 +73,22 @@
       observer.observe(document.getElementById('root'), { childList: true });
     </script>
     <script>
-      // Global Input Behavior: Auto-select text on focus
-      // This fixes the "delete written first" annoyance
-      document.addEventListener('focus', function(e) {
-        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
-          const type = e.target.type;
-          if (['text', 'number', 'email', 'password', 'search', 'tel', 'url'].includes(type) || e.target.tagName === 'TEXTAREA') {
-            setTimeout(() => {
-              try { e.target.select(); } catch (err) {}
-            }, 10);
-          }
-        }
-      }, true);
+      // Safe opt-in auto-select:
+      // use only on fields that explicitly have data-select-on-focus="true"
+      document.addEventListener('focusin', function (e) {
+        const el = e.target;
+        if (!el) return;
+        if (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') return;
+        if (el.getAttribute('data-select-on-focus') !== 'true') return;
+
+        const type = (el.type || '').toLowerCase();
+        if (['password', 'email'].includes(type)) return;
+
+        requestAnimationFrame(() => {
+          try { el.select(); } catch (_) {}
+        });
+      });
     </script>
-    
     <!-- Service Worker Registration -->
     <!-- Service Worker handled by vite-plugin-pwa -->
   </body>

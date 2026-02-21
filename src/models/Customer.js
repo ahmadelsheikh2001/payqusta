@@ -137,6 +137,7 @@ const customerSchema = new mongoose.Schema(
           icon: String,
         },
       ],
+      lastDailyRewardClaim: { type: Date },
     },
     // WhatsApp preferences
     whatsapp: {

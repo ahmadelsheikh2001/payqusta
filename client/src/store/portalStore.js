@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import axios from 'axios';
 
-const API_URL = '/api/v1';
+const API_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
 // Create axios instance for portal
 export const portalApi = axios.create({
@@ -329,6 +329,15 @@ export const usePortalStore = create((set, get) => ({
       if (search) params.search = search;
       if (category) params.category = category;
       const res = await portalApi.get('/portal/products', { params });
+      return res.data.data;
+    } catch (err) {
+      return null;
+    }
+  },
+
+  fetchProductDetails: async (id) => {
+    try {
+      const res = await portalApi.get(`/portal/products/${id}`);
       return res.data.data;
     } catch (err) {
       return null;
@@ -670,6 +679,26 @@ export const usePortalStore = create((set, get) => ({
       return res.data.data;
     } catch (err) {
       return null;
+    }
+  },
+
+  claimDailyReward: async () => {
+    try {
+      const res = await portalApi.post('/portal/gamification/daily-reward');
+      // Update customer points and tier in store if successful
+      if (res.data.data) {
+        const currentCustomer = get().customer;
+        const updatedCustomer = {
+          ...currentCustomer,
+          points: res.data.data.points,
+          tier: res.data.data.tier
+        };
+        localStorage.setItem('portal_customer', JSON.stringify(updatedCustomer));
+        set({ customer: updatedCustomer });
+      }
+      return { success: true, data: res.data.data, message: res.data.message };
+    } catch (err) {
+      return { success: false, message: err.response?.data?.message || 'فشل جمع المكافأة' };
     }
   },
 

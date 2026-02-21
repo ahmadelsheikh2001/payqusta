@@ -6,6 +6,8 @@ import {
   ChevronDown, ChevronUp, RefreshCw
 } from 'lucide-react';
 import { notify } from '../components/AnimatedNotification';
+import PortalEmptyState from './components/PortalEmptyState';
+import PortalSkeleton from './components/PortalSkeleton';
 
 const QUICK_RANGES = [
   { label: 'أسبوع', days: 7 },
@@ -139,10 +141,7 @@ export default function PortalStatement() {
 
       {/* ══ LOADING ══ */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-3">
-          <div className="w-10 h-10 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
-          <p className="text-sm text-gray-400">جاري تحميل كشف الحساب...</p>
-        </div>
+        <PortalSkeleton count={3} type="card" className="mt-4" />
       ) : !data ? (
         <div className="text-center py-16">
           <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-3" />
@@ -213,11 +212,12 @@ export default function PortalStatement() {
             </div>
 
             {(!data.entries || data.entries.length === 0) ? (
-              <div className="text-center py-16 bg-gray-50 dark:bg-gray-800/30 rounded-2xl">
-                <FileText className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
-                <p className="text-gray-500 dark:text-gray-400 font-medium">لا توجد حركات في هذه الفترة</p>
-                <p className="text-xs text-gray-400 mt-1">جرب تحديد نطاق زمني أوسع</p>
-              </div>
+              <PortalEmptyState
+                icon={FileText}
+                title="لا توجد حركات في هذه الفترة"
+                message="جرب تحديد نطاق زمني أوسع"
+                className="my-4 border-none bg-gray-50 dark:bg-gray-800/30"
+              />
             ) : (
               <div className="space-y-2">
                 {data.entries.map((entry, idx) => {

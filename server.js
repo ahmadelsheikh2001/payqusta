@@ -17,6 +17,7 @@ const hpp = require('hpp');
 const mongoSanitize = require('express-mongo-sanitize');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
+const { v4: uuidv4 } = require('uuid');
 
 const connectDB = require('./src/config/database');
 const { errorHandler, notFound } = require('./src/middleware/errorHandler');
@@ -33,6 +34,9 @@ class PayQustaServer {
   constructor() {
     this.app = express();
     this.port = process.env.PORT || 5000;
+
+    // Behind a reverse proxy (Render / Nginx) we need correct IPs & HTTPS detection
+    this.app.set('trust proxy', 1);
   }
 
   /**
@@ -82,6 +86,13 @@ class PayQustaServer {
    * Configure Express middleware stack
    */
   _configureMiddleware() {
+    // Add Request ID
+    this.app.use((req, res, next) => {
+      req.requestId = req.headers['x-request-id'] || uuidv4();
+      res.setHeader('x-request-id', req.requestId);
+      next();
+    });
+
     // Security headers with Helmet
     this.app.use(helmet({
       contentSecurityPolicy: process.env.NODE_ENV === 'production' ? {
@@ -140,7 +151,13 @@ class PayQustaServer {
     // General API Rate limiting
     const apiLimiter = rateLimit({
       windowMs: 15 * 60 * 1000, // 15 minutes
-      max: process.env.NODE_ENV === 'production' ? 100 : 1000, // Strict in production
+      max: (req) => {
+        const isPortalRequest = req.originalUrl?.startsWith('/api/v1/portal');
+        if (isPortalRequest) {
+          return process.env.NODE_ENV === 'production' ? 600 : 5000;
+        }
+        return process.env.NODE_ENV === 'production' ? 100 : 1000;
+      },
       message: {
         success: false,
         message: 'تم تجاوز الحد الأقصى للطلبات. يرجى المحاولة لاحقاً.',
@@ -189,8 +206,14 @@ class PayQustaServer {
     this.app.use(compression());
 
     // Logging — Morgan writes HTTP requests to Winston (dev + prod)
-    const morganFormat = process.env.NODE_ENV === 'development' ? 'dev' : 'combined';
-    this.app.use(morgan(morganFormat, { stream: logger.morganStream }));
+    morgan.token('id', (req) => req.requestId);
+    const morganFormat = process.env.NODE_ENV === 'development'
+      ? ':id :method :url :status :response-time ms - :res[content-length]'
+      : ':id :remote-addr - :remote-user [:date[clf]] ":method :url HTTP/:http-version" :status :res[content-length] ":referrer" ":user-agent"';
+
+    this.app.use(morgan(morganFormat, {
+      stream: { write: (message) => logger.info(message.trim(), { type: 'http' }) }
+    }));
 
     // Static files
     this.app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

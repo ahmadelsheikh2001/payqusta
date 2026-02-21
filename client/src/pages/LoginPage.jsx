@@ -76,8 +76,10 @@ export default function LoginPage() {
             {isRegister && (
               <>
                 <div className="mb-4">
-                  <label className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">الاسم الكامل</label>
+                  <label htmlFor="register-name" className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">الاسم الكامل</label>
                   <input
+                    id="register-name"
+                    name="name"
                     type="text"
                     value={registerData.name}
                     onChange={(e) => setRegisterData({ ...registerData, name: e.target.value })}
@@ -87,8 +89,10 @@ export default function LoginPage() {
                   />
                 </div>
                 <div className="mb-4">
-                  <label className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">اسم المتجر</label>
+                  <label htmlFor="register-store-name" className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">اسم المتجر</label>
                   <input
+                    id="register-store-name"
+                    name="storeName"
                     type="text"
                     value={registerData.storeName}
                     onChange={(e) => setRegisterData({ ...registerData, storeName: e.target.value })}
@@ -98,8 +102,10 @@ export default function LoginPage() {
                   />
                 </div>
                 <div className="mb-4">
-                  <label className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">رقم الهاتف</label>
+                  <label htmlFor="register-phone" className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">رقم الهاتف</label>
                   <input
+                    id="register-phone"
+                    name="phone"
                     type="tel"
                     value={registerData.phone}
                     onChange={(e) => setRegisterData({ ...registerData, phone: e.target.value })}
@@ -112,9 +118,12 @@ export default function LoginPage() {
             )}
 
             <div className="mb-4">
-              <label className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">البريد الإلكتروني</label>
+              <label htmlFor="auth-email" className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">البريد الإلكتروني</label>
               <input
+                id="auth-email"
+                name="email"
                 type="email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 focus:border-primary-500 transition-all text-gray-900 dark:text-white"
@@ -124,10 +133,13 @@ export default function LoginPage() {
             </div>
 
             <div className="mb-4">
-              <label className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">كلمة المرور</label>
+              <label htmlFor="auth-password" className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">كلمة المرور</label>
               <div className="relative">
                 <input
+                  id="auth-password"
+                  name="password"
                   type={showPass ? 'text' : 'password'}
+                  autoComplete={isRegister ? 'new-password' : 'current-password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 focus:border-primary-500 transition-all text-gray-900 dark:text-white pl-12"

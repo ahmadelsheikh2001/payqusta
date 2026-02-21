@@ -3,6 +3,8 @@ import { usePortalStore } from '../store/portalStore';
 import { useThemeStore } from '../store';
 import { Receipt, Eye, X, Calendar, CreditCard, Clock, CheckCircle, AlertTriangle, ChevronLeft, ChevronRight, Filter, Download, RefreshCcw, DollarSign } from 'lucide-react';
 import { notify } from '../components/AnimatedNotification';
+import PortalEmptyState from './components/PortalEmptyState';
+import PortalSkeleton from './components/PortalSkeleton';
 
 
 const statusConfig = {
@@ -95,16 +97,14 @@ export default function PortalInvoices() {
 
       {/* Loading */}
       {loading ? (
-        <div className="flex justify-center py-16">
-          <div className="w-10 h-10 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
-        </div>
+        <PortalSkeleton count={4} type="card" />
       ) : invoices.length === 0 ? (
-        <div className="text-center py-16">
-          <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Receipt className="w-8 h-8 text-gray-400" />
-          </div>
-          <p className="text-gray-500 dark:text-gray-400 font-medium">لا توجد فواتير</p>
-        </div>
+        <PortalEmptyState
+          icon={Receipt}
+          title="لا توجد فواتير"
+          message="لم تقم بإجراء أي عمليات شراء حتى الآن."
+          className="my-8"
+        />
       ) : (
         <div className="space-y-3">
           {invoices.map((inv) => {
@@ -408,7 +408,7 @@ export default function PortalInvoices() {
                       className={`py-2 rounded-xl text-sm font-bold transition ${payMethod === m.value
                         ? 'bg-primary-500 text-white shadow-md'
                         : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-                      }`}
+                        }`}
                     >
                       {m.label}
                     </button>

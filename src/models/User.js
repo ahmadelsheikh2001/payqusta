@@ -75,7 +75,7 @@ const userSchema = new mongoose.Schema(
     passwordChangedAt: { type: Date },
     passwordResetToken: { type: String },
     passwordResetExpires: { type: Date },
-    
+
     // Gamification & Performance
     gamification: {
       points: { type: Number, default: 0 },
@@ -88,6 +88,8 @@ const userSchema = new mongoose.Schema(
       streak: { type: Number, default: 0 },
       lastSaleDate: { type: Date }
     },
+    // Commission settings
+    commissionRate: { type: Number, default: 0, min: 0, max: 100 }, // Percentage of profit
   },
   {
     timestamps: true,

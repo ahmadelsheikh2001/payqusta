@@ -34,13 +34,15 @@ class SupplierController {
     const supplierIds = suppliers.map((s) => s._id);
     const productAgg = await Product.aggregate([
       { $match: { tenant: suppliers[0]?.tenant || null, supplier: { $in: supplierIds }, isActive: true } },
-      { $group: {
-        _id: '$supplier',
-        count: { $sum: 1 },
-        categories: { $addToSet: '$category' },
-        totalStock: { $sum: '$stock.quantity' },
-        productNames: { $push: { name: '$name', sku: '$sku', stockQty: '$stock.quantity', stockStatus: '$stockStatus' } },
-      }},
+      {
+        $group: {
+          _id: '$supplier',
+          count: { $sum: 1 },
+          categories: { $addToSet: '$category' },
+          totalStock: { $sum: '$stock.quantity' },
+          productNames: { $push: { name: '$name', sku: '$sku', stockQty: '$stock.quantity', stockStatus: '$stockStatus' } },
+        }
+      },
     ]);
 
     const productMap = {};
@@ -150,17 +152,17 @@ class SupplierController {
     if (!supplier) return next(AppError.notFound('المورد غير موجود'));
 
     try {
-        const tenant = await Tenant.findById(req.tenantId);
-        const result = await WhatsAppService.sendSupplierPaymentReminder(supplier, tenant?.whatsapp);
+      const tenant = await Tenant.findById(req.tenantId);
+      const result = await WhatsAppService.sendSupplierPaymentReminder(supplier, tenant?.whatsapp);
 
-        if (result && !result.failed && !result.skipped) {
-          ApiResponse.success(res, null, 'تم إرسال التذكير عبر WhatsApp');
-        } else {
-          ApiResponse.success(res, { whatsappStatus: 'failed' },
-            'تعذر الإرسال — تحقق من اتصال الإنترنت أو إعدادات WhatsApp');
-        }
+      if (result && !result.failed && !result.skipped) {
+        ApiResponse.success(res, null, 'تم إرسال التذكير عبر WhatsApp');
+      } else {
+        ApiResponse.success(res, { whatsappStatus: 'failed' },
+          'تعذر الإرسال — تحقق من اتصال الإنترنت أو إعدادات WhatsApp');
+      }
     } catch (error) {
-        ApiResponse.success(res, { whatsappStatus: 'error' }, 'تعذر الإرسال عبر WhatsApp');
+      ApiResponse.success(res, { whatsappStatus: 'error' }, 'تعذر الإرسال عبر WhatsApp');
     }
   });
 
@@ -265,7 +267,7 @@ class SupplierController {
       supplier: supplier._id,
       isActive: true,
       $expr: { $lte: ['$stock.quantity', '$stock.minQuantity'] },
-    }).select('name sku stock.quantity stock.minQuantity costPrice sellingPrice category').lean();
+    }).select('name sku stock.quantity stock.minQuantity cost price category').lean();
 
     ApiResponse.success(res, {
       supplier: { _id: supplier._id, name: supplier.name, phone: supplier.phone },

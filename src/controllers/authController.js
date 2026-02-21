@@ -322,6 +322,10 @@ class AuthController {
       return next(AppError.badRequest('الدور غير مسموح به'));
     }
 
+    if (!password || password.length < 8) {
+      return next(AppError.badRequest('كلمة المرور مطلوبة ويجب أن تكون 8 أحرف على الأقل'));
+    }
+
     // Check if email exists in this tenant
     const existing = await User.findOne({ email, tenant: req.tenantId });
     if (existing) {

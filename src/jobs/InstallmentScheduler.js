@@ -80,13 +80,14 @@ class InstallmentScheduler {
                 invoice.customer.name,
                 invoice.invoiceNumber,
                 installment.amount,
-                installment.dueDate
-              ).catch(() => {});
+                installment.dueDate,
+                invoice.branch
+              ).catch(() => { });
 
               // WhatsApp reminder (only if tenant + customer both enabled)
               const customerWA = invoice.customer.whatsapp;
               if (tenant.whatsapp?.enabled && tenant.whatsapp?.notifications?.installmentReminder
-                  && customerWA?.enabled && customerWA?.notifications?.reminders !== false) {
+                && customerWA?.enabled && customerWA?.notifications?.reminders !== false) {
                 const phone = customerWA?.number || invoice.customer.phone;
 
                 await WhatsAppService.sendInstallmentReminder(
@@ -170,7 +171,7 @@ class InstallmentScheduler {
                 supplier.name,
                 payment.amount,
                 payment.dueDate
-              ).catch(() => {});
+              ).catch(() => { });
 
               // WhatsApp reminder (only if enabled)
               if (tenant.whatsapp?.enabled && tenant.whatsapp?.notifications?.supplierPaymentDue) {
@@ -224,8 +225,9 @@ class InstallmentScheduler {
             invoice.tenant,
             invoice.customer?.name || 'عميل',
             invoice.invoiceNumber,
-            inst.amount
-          ).catch(() => {});
+            inst.amount,
+            invoice.branch
+          ).catch(() => { });
         }
       }
 

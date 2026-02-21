@@ -140,8 +140,8 @@ const productValidations = {
   create: [
     commonValidations.name('name'),
     body('sku').trim().notEmpty().withMessage('SKU مطلوب'),
-    commonValidations.positiveNumber('purchasePrice'),
-    commonValidations.positiveNumber('sellingPrice'),
+    commonValidations.positiveNumber('cost'),
+    commonValidations.positiveNumber('price'),
     body('category').optional().trim().isLength({ max: 50 }),
     commonValidations.positiveInt('stock.quantity'),
     commonValidations.positiveInt('stock.minQuantity'),
@@ -151,8 +151,8 @@ const productValidations = {
   update: [
     commonValidations.mongoId('id'),
     commonValidations.name('name').optional(),
-    commonValidations.positiveNumber('purchasePrice').optional(),
-    commonValidations.positiveNumber('sellingPrice').optional(),
+    commonValidations.positiveNumber('cost').optional(),
+    commonValidations.positiveNumber('price').optional(),
     handleValidationErrors,
   ],
 };

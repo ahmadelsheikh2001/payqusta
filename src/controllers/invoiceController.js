@@ -351,6 +351,7 @@ class InvoiceController {
         message: `تم تحديث حالة طلبك إلى: ${labels[orderStatus] || orderStatus}`,
         icon: 'package',
         color: orderStatus === 'delivered' ? 'success' : orderStatus === 'cancelled' ? 'danger' : 'info',
+        link: `/portal/orders/${invoice._id}`
       });
     } catch { /* ignore */ }
 

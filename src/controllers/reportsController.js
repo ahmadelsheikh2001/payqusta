@@ -14,12 +14,13 @@ class ReportsController {
    * Get sales report
    */
   getSalesReport = catchAsync(async (req, res, next) => {
-    const { startDate, endDate, groupBy } = req.query;
+    const { startDate, endDate, groupBy, branch } = req.query;
 
     const report = await ReportsService.getSalesReport(req.tenantId, {
       startDate,
       endDate,
       groupBy: groupBy || 'day',
+      branchId: branch
     });
 
     ApiResponse.success(res, report);
@@ -30,11 +31,12 @@ class ReportsController {
    * Get profit analysis report
    */
   getProfitReport = catchAsync(async (req, res, next) => {
-    const { startDate, endDate } = req.query;
+    const { startDate, endDate, branch } = req.query;
 
     const report = await ReportsService.getProfitReport(req.tenantId, {
       startDate,
       endDate,
+      branchId: branch
     });
 
     ApiResponse.success(res, report);
@@ -92,12 +94,13 @@ class ReportsController {
    * Export sales report to Excel
    */
   exportSalesReport = catchAsync(async (req, res, next) => {
-    const { startDate, endDate, groupBy } = req.query;
+    const { startDate, endDate, groupBy, branch } = req.query;
 
     const report = await ReportsService.getSalesReport(req.tenantId, {
       startDate,
       endDate,
       groupBy: groupBy || 'day',
+      branchId: branch
     });
 
     const buffer = await ExcelService.generateSalesReport(report);
@@ -112,11 +115,12 @@ class ReportsController {
    * Export profit report to Excel
    */
   exportProfitReport = catchAsync(async (req, res, next) => {
-    const { startDate, endDate } = req.query;
+    const { startDate, endDate, branch } = req.query;
 
     const report = await ReportsService.getProfitReport(req.tenantId, {
       startDate,
       endDate,
+      branchId: branch
     });
 
     const buffer = await ExcelService.generateProfitReport(report);

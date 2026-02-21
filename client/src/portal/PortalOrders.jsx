@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { usePortalStore } from '../store/portalStore';
 import { Package, Clock, CheckCircle, Truck, XCircle, RotateCcw, ChevronLeft, X, ShoppingBag } from 'lucide-react';
 import { notify } from '../components/AnimatedNotification';
+import PortalEmptyState from './components/PortalEmptyState';
+import PortalSkeleton from './components/PortalSkeleton';
 
 const orderStatusConfig = {
     pending: { label: 'قيد المراجعة', color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400', icon: Clock },
@@ -116,16 +118,14 @@ export default function PortalOrders() {
 
             {/* Orders */}
             {loading ? (
-                <div className="flex justify-center py-16">
-                    <div className="w-10 h-10 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
-                </div>
+                <PortalSkeleton count={3} type="card" className="mt-4" />
             ) : orders.length === 0 ? (
-                <div className="text-center py-16">
-                    <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <ShoppingBag className="w-8 h-8 text-gray-400" />
-                    </div>
-                    <p className="text-gray-500 dark:text-gray-400 font-medium">لا توجد طلبات</p>
-                </div>
+                <PortalEmptyState
+                    icon={ShoppingBag}
+                    title="لا توجد طلبات"
+                    message="لم تقم بإجراء أي طلبات حتى الآن."
+                    className="my-8"
+                />
             ) : (
                 <div className="space-y-3">
                     {orders.map((order) => {
@@ -257,17 +257,20 @@ export default function PortalOrders() {
                                     {selectedOrder.orderStatus !== 'cancelled' && (
                                         <div className="bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-4">
                                             <h4 className="font-bold text-sm mb-3 text-gray-700 dark:text-gray-300">تتبع الطلب</h4>
-                                            <div className="space-y-3">
+                                            <div className="space-y-0 relative">
+                                                <div className="absolute top-4 bottom-4 right-4 w-0.5 bg-gray-200 dark:bg-gray-700 z-0"></div>
                                                 {trackingSteps.map((step, idx) => {
                                                     const currentIdx = getStepIndex(selectedOrder.orderStatus);
                                                     const isDone = idx <= currentIdx;
+                                                    const isLast = idx === trackingSteps.length - 1;
                                                     return (
-                                                        <div key={step.key} className="flex items-center gap-3">
-                                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${isDone ? 'bg-primary-500 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-400'}`}>
+                                                        <div key={step.key} className={`flex items-start gap-4 relative z-10 ${isLast ? '' : 'pb-6'}`}>
+                                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ring-4 ring-gray-50 dark:ring-gray-800 ${isDone ? 'bg-primary-500 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-400'}`}>
                                                                 {isDone ? '✓' : idx + 1}
                                                             </div>
-                                                            <div className="flex-1">
+                                                            <div className="mt-1">
                                                                 <p className={`text-sm font-bold ${isDone ? 'text-gray-900 dark:text-white' : 'text-gray-400'}`}>{step.label}</p>
+                                                                {isDone && <p className="text-[10px] text-gray-500 mt-1">تمت العملية بنجاح</p>}
                                                             </div>
                                                         </div>
                                                     );

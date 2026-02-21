@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Activity, Filter, Download, Search, Calendar } from 'lucide-react';
-import { api, auditLogsApi } from '../store';
+import { api, auditLogsApi, API_URL } from '../store';
 import { Card, Input, Select, Button, Badge, LoadingSpinner, EmptyState } from '../components/UI';
 import Pagination from '../components/Pagination';
 import { format } from 'date-fns';
@@ -48,7 +48,7 @@ export default function ActivityLogsPage() {
         limit: 25,
         ...Object.fromEntries(Object.entries(filters).filter(([_, v]) => v)),
       };
-      
+
       const res = await auditLogsApi.getLogs(params);
       setLogs(res.data.data);
       setPagination(res.data.pagination);
@@ -71,7 +71,7 @@ export default function ActivityLogsPage() {
   const handleExport = async () => {
     try {
       const params = new URLSearchParams(Object.fromEntries(Object.entries(filters).filter(([_, v]) => v)));
-      window.open(`/api/v1/admin/audit-logs/export?${params}`, '_blank');
+      window.open(`${API_URL}/admin/audit-logs/export?${params}`, '_blank');
     } catch (err) {
       console.error('Export failed:', err);
     }
@@ -128,10 +128,10 @@ export default function ActivityLogsPage() {
         {loading ? (
           <LoadingSpinner />
         ) : logs.length === 0 ? (
-          <EmptyState 
-            icon={Activity} 
-            title="لا توجد سجلات" 
-            description="لم يتم العثور على أنشطة بالمعايير المحددة" 
+          <EmptyState
+            icon={Activity}
+            title="لا توجد سجلات"
+            description="لم يتم العثور على أنشطة بالمعايير المحددة"
           />
         ) : (
           <div className="overflow-x-auto">

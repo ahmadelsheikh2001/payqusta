@@ -75,6 +75,8 @@ import PortalNotifications from './portal/PortalNotifications';
 import PortalCheckout from './portal/PortalCheckout';
 import PortalPointsHistory from './portal/PortalPointsHistory';
 import PortalReviews from './portal/PortalReviews';
+import PortalProducts from './portal/PortalProducts';
+import PortalProductDetails from './portal/PortalProductDetails';
 
 
 // Protected Route wrapper
@@ -260,8 +262,8 @@ export default function App() {
             <Route path="notifications" element={<PortalNotifications />} />
             <Route path="points" element={<PortalPointsHistory />} />
             <Route path="reviews" element={<PortalReviews />} />
-            <Route path="products" element={<ProductCatalog />} />
-            <Route path="products/:id" element={<ProductDetails />} />
+            <Route path="products" element={<PortalProducts />} />
+            <Route path="products/:id" element={<PortalProductDetails />} />
             <Route path="cart" element={<ShoppingCart />} />
             <Route path="checkout" element={<PortalCheckout />} />
           </Route>

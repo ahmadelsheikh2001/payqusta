@@ -63,7 +63,7 @@ const options = {
             barcode: { type: 'string', example: '6281234567890' },
             category: { type: 'string', example: 'إلكترونيات' },
             price: { type: 'number', example: 5000 },
-            costPrice: { type: 'number', example: 4000 },
+            cost: { type: 'number', example: 4000 },
             stock: {
               type: 'object',
               properties: {

@@ -3,10 +3,9 @@ import {
   RefreshCcw, Search, Filter, Eye, CheckCircle, XCircle, Package,
   Clock, AlertTriangle, ArrowLeft, MessageSquare, Hash, User, Phone
 } from 'lucide-react';
-import { useAuthStore } from '../store';
+import { useAuthStore, api as globalApi } from '../store';
 import { Card, LoadingSpinner, EmptyState, Modal } from '../components/UI';
 import { notify } from '../components/AnimatedNotification';
-import axios from 'axios';
 
 const STATUS_CONFIG = {
   pending: { label: 'قيد المراجعة', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', icon: Clock },
@@ -35,8 +34,8 @@ export default function ReturnsManagementPage() {
   const { token } = useAuthStore();
 
   const api = useCallback((method, url, data) =>
-    axios({ method, url: `/api/v1${url}`, data, headers: { Authorization: `Bearer ${token}` } }),
-    [token]
+    globalApi({ method, url, data }),
+    []
   );
 
   const load = useCallback(async () => {

@@ -158,6 +158,11 @@ const invoiceSchema = new mongoose.Schema(
     electronicSignature: {
       type: String,
     },
+    // Commission Data
+    commission: {
+      amount: { type: Number, default: 0 },
+      isPaid: { type: Boolean, default: false },
+    },
   },
   {
     timestamps: true,
@@ -181,6 +186,7 @@ invoiceSchema.index({ tenant: 1, paymentMethod: 1, status: 1 });
 // Pre-save: Calculate totals and status
 invoiceSchema.pre('save', function (next) {
   // Calculate subtotal and tax from items
+  let currentProfit = 0;
   if (this.items && this.items.length > 0) {
     this.subtotal = this.items.reduce((sum, item) => sum + item.totalPrice, 0);
 

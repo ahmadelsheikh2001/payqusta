@@ -3,6 +3,8 @@ import { usePortalStore } from '../store/portalStore';
 import { useThemeStore } from '../store';
 import { Star, MessageSquare, CheckCircle, Clock, ChevronDown, ChevronUp, Plus, X } from 'lucide-react';
 import { notify } from '../components/AnimatedNotification';
+import PortalEmptyState from './components/PortalEmptyState';
+import PortalSkeleton from './components/PortalSkeleton';
 
 function StarRating({ value, onChange, size = 'md' }) {
   const [hovered, setHovered] = useState(0);
@@ -44,13 +46,12 @@ function ReviewCard({ review }) {
               <CheckCircle className="w-3 h-3" /> شراء موثق
             </span>
           )}
-          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-            review.status === 'approved'
+          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${review.status === 'approved'
               ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
               : review.status === 'rejected'
-              ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
-              : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400'
-          }`}>
+                ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400'
+            }`}>
             {review.status === 'approved' ? 'منشور' : review.status === 'rejected' ? 'مرفوض' : 'قيد المراجعة'}
           </span>
         </div>
@@ -165,11 +166,10 @@ export default function PortalReviews() {
               <button
                 key={t.value}
                 onClick={() => setForm({ ...form, type: t.value })}
-                className={`px-4 py-2 rounded-xl text-sm font-bold transition ${
-                  form.type === t.value
+                className={`px-4 py-2 rounded-xl text-sm font-bold transition ${form.type === t.value
                     ? 'bg-primary-500 text-white'
                     : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-                }`}
+                  }`}
               >
                 {t.label}
               </button>
@@ -224,17 +224,14 @@ export default function PortalReviews() {
 
       {/* Reviews List */}
       {loading ? (
-        <div className="flex justify-center py-16">
-          <div className="w-10 h-10 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
-        </div>
+        <PortalSkeleton count={4} type="card" className="mt-4" />
       ) : reviews.length === 0 ? (
-        <div className="text-center py-16">
-          <div className="w-16 h-16 bg-yellow-50 dark:bg-yellow-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Star className="w-8 h-8 text-yellow-400" />
-          </div>
-          <p className="text-gray-500 dark:text-gray-400 font-medium">لم تقم بأي تقييم بعد</p>
-          <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">شاركنا تجربتك مع المتجر</p>
-        </div>
+        <PortalEmptyState
+          icon={Star}
+          title="لم تقم بأي تقييم بعد"
+          message="شاركنا تجربتك مع المتجر"
+          className="my-8"
+        />
       ) : (
         <div className="space-y-3">
           {reviews.map((review) => (

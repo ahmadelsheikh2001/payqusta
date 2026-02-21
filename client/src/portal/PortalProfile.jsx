@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { usePortalStore } from '../store/portalStore';
 import { useThemeStore } from '../store';
-import { User, Phone, Mail, MapPin, Lock, Eye, EyeOff, Save, Award, Star, ShoppingBag, Crown, Shield, FileText, ChevronLeft } from 'lucide-react';
+import { User, Phone, Mail, MapPin, Lock, Eye, EyeOff, Save, Award, Star, ShoppingBag, Crown, Shield, FileText, ChevronLeft, Bell } from 'lucide-react';
 import { notify } from '../components/AnimatedNotification';
 
 const tierConfig = {
@@ -104,8 +104,7 @@ export default function PortalProfile() {
     { id: 'addresses', label: 'عناويني', icon: MapPin },
     { id: 'password', label: 'الأمان', icon: Lock },
     { id: 'points', label: 'النقاط', icon: Star },
-    { id: 'settings', label: 'الإعدادات', icon: Bell },
-    { id: 'points', label: 'نقاطي', icon: Star },
+    { id: 'settings', label: 'الإعدادات', icon: Bell }
   ];
 
   return (
@@ -170,8 +169,8 @@ export default function PortalProfile() {
             key={s.id}
             onClick={() => setActiveSection(s.id)}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all ${activeSection === s.id
-                ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/30'
-                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
+              ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/30'
+              : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
               }`}
           >
             <s.icon className="w-4 h-4" />
@@ -212,9 +211,6 @@ export default function PortalProfile() {
               <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputClass} placeholder="example@email.com" />
             </div>
           </div>
-
-
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">تاريخ الميلاد</label>

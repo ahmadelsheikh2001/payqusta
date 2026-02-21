@@ -62,6 +62,26 @@ input:focus, select:focus, textarea:focus {
   border-color: #6366f1 !important;
 }
 
+/* Fix aggressive browser autofill colors (especially email/password fields) */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-text-fill-color: #111827;
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+  transition: background-color 9999s ease-out 0s;
+}
+
+.dark input:-webkit-autofill,
+.dark input:-webkit-autofill:hover,
+.dark input:-webkit-autofill:focus,
+.dark textarea:-webkit-autofill,
+.dark select:-webkit-autofill {
+  -webkit-text-fill-color: #f9fafb;
+  -webkit-box-shadow: 0 0 0 1000px #111827 inset !important;
+}
+
 /* Glassmorphism Utilities */
 .glass {
   background: var(--glass-bg);

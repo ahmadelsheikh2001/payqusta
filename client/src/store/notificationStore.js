@@ -5,6 +5,8 @@
 
 import { create } from 'zustand';
 
+const API_URL = import.meta.env.VITE_API_URL || '/api/v1';
+
 const useNotificationStore = create((set, get) => ({
   permission: 'default',
   subscription: null,
@@ -19,16 +21,16 @@ const useNotificationStore = create((set, get) => ({
       return { success: false, reason: 'not_supported' };
     }
 
-    set({ 
+    set({
       isSupported: true,
-      permission: Notification.permission 
+      permission: Notification.permission
     });
 
     // If already granted, try to get existing subscription
     if (Notification.permission === 'granted') {
       const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.getSubscription();
-      
+
       if (subscription) {
         set({ subscription, isSubscribed: true });
       }
@@ -40,7 +42,7 @@ const useNotificationStore = create((set, get) => ({
   // Request permission and subscribe
   subscribe: async () => {
     const { isSupported } = get();
-    
+
     if (!isSupported) {
       return { success: false, reason: 'not_supported' };
     }
@@ -68,7 +70,7 @@ const useNotificationStore = create((set, get) => ({
       set({ subscription, isSubscribed: true });
 
       // Send subscription to server
-      await fetch('/api/v1/notifications/subscribe', {
+      await fetch(`${API_URL}/notifications/subscribe`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -94,9 +96,9 @@ const useNotificationStore = create((set, get) => ({
 
     try {
       await subscription.unsubscribe();
-      
+
       // Notify server
-      await fetch('/api/v1/notifications/unsubscribe', {
+      await fetch(`${API_URL}/notifications/unsubscribe`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

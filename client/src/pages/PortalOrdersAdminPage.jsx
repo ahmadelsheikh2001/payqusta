@@ -3,8 +3,7 @@ import {
     ShoppingBag, MapPin, Phone, User, Search, Eye, CheckCircle,
     Truck, Package, XCircle, Clock, RefreshCw, Filter
 } from 'lucide-react';
-import axios from 'axios';
-import { useAuthStore } from '../store';
+import { useAuthStore, api } from '../store';
 import { Badge, Card, LoadingSpinner, EmptyState, Modal } from '../components/UI';
 import { notify } from '../components/AnimatedNotification';
 import Pagination from '../components/Pagination';
@@ -53,9 +52,8 @@ export default function PortalOrdersAdminPage() {
             const params = { page, limit: LIMIT, source: 'portal', sort: '-createdAt' };
             if (statusFilter) params.orderStatus = statusFilter;
             if (search) params.search = search;
-            const res = await axios.get('/api/v1/invoices', {
+            const res = await api.get('/invoices', {
                 params,
-                headers: { Authorization: `Bearer ${token}` },
             });
             const payload = res.data?.data || res.data;
             const list = Array.isArray(payload) ? payload : (payload?.invoices || []);
@@ -75,9 +73,8 @@ export default function PortalOrdersAdminPage() {
     const updateStatus = async (orderId, newStatus) => {
         setUpdatingId(orderId);
         try {
-            await axios.patch(`/api/v1/invoices/${orderId}/order-status`,
-                { orderStatus: newStatus },
-                { headers: { Authorization: `Bearer ${token}` } }
+            await api.patch(`/invoices/${orderId}/order-status`,
+                { orderStatus: newStatus }
             );
             notify.success('تم تحديث حالة الطلب');
             load();

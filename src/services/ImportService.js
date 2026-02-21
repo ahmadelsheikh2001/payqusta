@@ -78,8 +78,8 @@ class ImportService {
         if (existing) {
           if (updateExisting) {
             await Product.findByIdAndUpdate(existing._id, {
-              sellingPrice: Number(row.price || row['سعر البيع'] || row.sellingPrice) || existing.sellingPrice,
-              costPrice: Number(row.cost || row['سعر الشراء'] || row.costPrice) || existing.costPrice,
+              price: Number(row.price || row['سعر البيع'] || row.sellingPrice) || existing.price,
+              cost: Number(row.cost || row['سعر الشراء'] || row.costPrice) || existing.cost,
               'stock.quantity': Number(row.stock || row['الكمية'] || row.quantity) ?? existing.stock?.quantity,
               category: row.category || row['الفئة'] || existing.category,
             });
@@ -98,8 +98,8 @@ class ImportService {
           sku,
           barcode,
           category: row.category || row['الفئة'] || 'عام',
-          sellingPrice: Number(row.price || row['سعر البيع'] || row.sellingPrice) || 0,
-          costPrice: Number(row.cost || row['سعر الشراء'] || row.costPrice) || 0,
+          price: Number(row.price || row['سعر البيع'] || row.sellingPrice) || 0,
+          cost: Number(row.cost || row['سعر الشراء'] || row.costPrice) || 0,
           stock: {
             quantity: Number(row.stock || row['الكمية'] || row.quantity) || 0,
             minQuantity: Number(row.minStock || row['الحد الأدنى'] || row.minQuantity) || 5,

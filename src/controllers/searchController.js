@@ -48,7 +48,7 @@ class SearchController {
         ],
       })
         .limit(10)
-        .select('name sku barcode category sellingPrice stock thumbnail')
+        .select('name sku barcode category price stock thumbnail')
         .lean(),
 
       // Search Customers

@@ -11,16 +11,19 @@ class ReportsService {
   /**
    * Get sales report with detailed breakdown
    */
-  async getSalesReport(tenantId, { startDate, endDate, groupBy = 'day' }) {
+  async getSalesReport(tenantId, { startDate, endDate, groupBy = 'day', branchId }) {
     const start = startDate ? new Date(startDate) : startOfMonth(new Date());
     const end = endDate ? new Date(endDate) : endOfMonth(new Date());
 
-    // Get all invoices in date range
-    const invoices = await Invoice.find({
-      tenantId,
+    const filter = {
+      tenant: tenantId,
       createdAt: { $gte: start, $lte: end },
       status: { $ne: 'cancelled' },
-    }).populate('customer', 'name phone');
+    };
+    if (branchId) filter.branch = branchId;
+
+    // Get all invoices in date range
+    const invoices = await Invoice.find(filter).populate('customer', 'name phone');
 
     // Calculate totals
     const totalRevenue = invoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
@@ -58,15 +61,18 @@ class ReportsService {
   /**
    * Get profit analysis report
    */
-  async getProfitReport(tenantId, { startDate, endDate }) {
+  async getProfitReport(tenantId, { startDate, endDate, branchId }) {
     const start = startDate ? new Date(startDate) : startOfMonth(new Date());
     const end = endDate ? new Date(endDate) : endOfMonth(new Date());
 
-    const invoices = await Invoice.find({
-      tenantId,
+    const filter = {
+      tenant: tenantId,
       createdAt: { $gte: start, $lte: end },
       status: { $ne: 'cancelled' },
-    }).populate('items.product', 'name sku category');
+    };
+    if (branchId) filter.branch = branchId;
+
+    const invoices = await Invoice.find(filter).populate('items.product', 'name sku category');
 
     // Calculate profit by category
     const profitByCategory = {};
@@ -77,15 +83,15 @@ class ReportsService {
         const product = item.product;
         if (!product) return;
 
-        const itemProfit = (item.sellingPrice - item.purchasePrice) * item.quantity;
+        const itemProfit = (item.unitPrice - (item.product?.cost || 0)) * item.quantity;
         const category = product.category || 'غير مصنف';
 
         // By category
         if (!profitByCategory[category]) {
           profitByCategory[category] = { revenue: 0, cost: 0, profit: 0, quantity: 0 };
         }
-        profitByCategory[category].revenue += item.sellingPrice * item.quantity;
-        profitByCategory[category].cost += item.purchasePrice * item.quantity;
+        profitByCategory[category].revenue += item.unitPrice * item.quantity;
+        profitByCategory[category].cost += (item.product?.cost || 0) * item.quantity;
         profitByCategory[category].profit += itemProfit;
         profitByCategory[category].quantity += item.quantity;
 
@@ -102,8 +108,8 @@ class ReportsService {
             quantity: 0,
           };
         }
-        profitByProduct[productKey].revenue += item.sellingPrice * item.quantity;
-        profitByProduct[productKey].cost += item.purchasePrice * item.quantity;
+        profitByProduct[productKey].revenue += item.unitPrice * item.quantity;
+        profitByProduct[productKey].cost += (item.product?.cost || 0) * item.quantity;
         profitByProduct[productKey].profit += itemProfit;
         profitByProduct[productKey].quantity += item.quantity;
       });
@@ -170,7 +176,7 @@ class ReportsService {
     const inventoryData = products.map(product => {
       const quantity = product.stock?.quantity || 0;
       const minQty = product.stock?.minQuantity || 0;
-      const value = quantity * (product.purchasePrice || 0);
+      const value = quantity * (product.cost || 0);
 
       totalValue += value;
       totalItems += quantity;
@@ -193,8 +199,8 @@ class ReportsService {
         category: product.category || 'غير مصنف',
         quantity,
         minQuantity: minQty,
-        purchasePrice: product.purchasePrice,
-        sellingPrice: product.sellingPrice,
+        cost: product.cost,
+        price: product.price,
         value,
         status,
         supplier: product.supplier?.name || 'لا يوجد',
@@ -303,8 +309,8 @@ class ReportsService {
         }
 
         productStats[productKey].quantitySold += item.quantity;
-        productStats[productKey].revenue += item.sellingPrice * item.quantity;
-        productStats[productKey].profit += (item.sellingPrice - item.purchasePrice) * item.quantity;
+        productStats[productKey].revenue += item.unitPrice * item.quantity;
+        productStats[productKey].profit += (item.unitPrice - (item.product?.cost || 0)) * item.quantity;
         productStats[productKey].invoiceCount++;
       });
     });

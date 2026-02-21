@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { usePortalStore } from '../store/portalStore';
-import { MessageCircle, Send, ChevronRight, Clock, CheckCircle2, User } from 'lucide-react';
+import { MessageCircle, Send, ChevronRight, Clock, CheckCircle2, User, FileText } from 'lucide-react';
 import { notify } from '../components/AnimatedNotification';
+import PortalEmptyState from './components/PortalEmptyState';
+import PortalSkeleton from './components/PortalSkeleton';
 
 export default function PortalSupportChat() {
     const { id } = useParams();
@@ -54,17 +56,23 @@ export default function PortalSupportChat() {
 
     if (loading) {
         return (
-            <div className="flex justify-center items-center min-h-[60vh]">
-                <span className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
+            <div className="pt-10 px-4" dir="rtl">
+                <PortalSkeleton count={4} type="card" />
             </div>
         );
     }
 
     if (!ticket) {
         return (
-            <div className="text-center py-20 px-6" dir="rtl">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">التذكرة غير موجودة</h2>
-                <Link to="/portal/support-messages" className="text-primary-600 hover:underline">العودة للدعم الفني</Link>
+            <div className="pt-10" dir="rtl">
+                <PortalEmptyState
+                    icon={FileText}
+                    title="التذكرة غير موجودة"
+                    message="يبدو أن هذه التذكرة غير موجودة أو تم حذفها."
+                    actionText="العودة للدعم الفني"
+                    onAction={() => window.location.href = '/portal/support-messages'}
+                    className="my-8"
+                />
             </div>
         );
     }
@@ -107,8 +115,8 @@ export default function PortalSupportChat() {
                     return (
                         <div key={idx} className={`flex flex-col gap-1 ${isCustomer ? 'items-start' : 'items-end'}`}>
                             <div className={`max-w-[85%] md:max-w-[75%] p-4 rounded-2xl shadow-sm ${isCustomer
-                                    ? 'bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-tr-sm'
-                                    : 'bg-primary-500 text-white rounded-tl-sm'
+                                ? 'bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-tr-sm'
+                                : 'bg-primary-500 text-white rounded-tl-sm'
                                 }`}>
                                 <p className={`whitespace-pre-wrap text-sm ${isCustomer ? 'text-gray-800 dark:text-gray-200' : 'text-white'}`}>
                                     {reply.message}

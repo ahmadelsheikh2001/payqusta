@@ -1,5 +1,7 @@
 // Offline Sync Utility for PayQusta PWA
 
+const API_URL = import.meta.env.VITE_API_URL || '/api/v1';
+
 class OfflineSync {
   constructor() {
     this.dbName = 'PayQustaOffline';
@@ -149,7 +151,7 @@ class OfflineSync {
 
     for (const invoice of pendingInvoices) {
       try {
-        const response = await fetch('/api/v1/invoices', {
+        const response = await fetch(`${API_URL}/invoices`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

@@ -519,11 +519,12 @@ export default function AdminUsersPage() {
                   <label className="block text-sm font-bold mb-2">كلمة المرور</label>
                   <Input
                     type="password"
-                    placeholder="اتركه فارغاً لاستخدام 123456"
+                    placeholder="8 أحرف على الأقل"
                     value={form.password}
                     onChange={(e) => setForm({ ...form, password: e.target.value })}
+                    required
                   />
-                  <p className="text-xs text-gray-400 mt-1">افتراضياً: 123456</p>
+                  <p className="text-xs text-gray-400 mt-1">مطلوب · 8 أحرف على الأقل</p>
                 </div>
                 <div>
                   <label className="block text-sm font-bold mb-2">الدور</label>

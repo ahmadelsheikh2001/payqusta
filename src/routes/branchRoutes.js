@@ -5,11 +5,12 @@
 const express = require('express');
 const router = express.Router();
 const branchController = require('../controllers/branchController');
+const checkLimit = require('../middleware/checkLimit');
 
 // All routes require authentication (handled by parent router)
 
 router.get('/', branchController.getBranches);
-router.post('/', branchController.createBranch);
+router.post('/', checkLimit('store'), branchController.createBranch);
 router.put('/:id', branchController.updateBranch);
 router.delete('/:id', branchController.deleteBranch);
 

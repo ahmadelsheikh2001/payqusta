@@ -3,10 +3,11 @@ import { Plus, Search, FileText, Send, Calculator, Check, X, CreditCard, Filter 
 import toast from 'react-hot-toast';
 import { notify } from '../components/AnimatedNotification';
 import { invoicesApi, customersApi, productsApi } from '../store';
-import { Button, Input, Select, Modal, Badge, Card, LoadingSpinner, EmptyState } from '../components/UI';
+import { Button, Input, Select, Modal, Badge, Card, LoadingSpinner, EmptyState, OwnerTableSkeleton } from '../components/UI';
 import Pagination from '../components/Pagination';
 
 export default function InvoicesPage() {
+  const FILTERS_STORAGE_KEY = 'owner_invoices_filters_v1';
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -41,11 +42,40 @@ export default function InvoicesPage() {
   const LIMIT = 10;
 
   useEffect(() => {
+    try {
+      const saved = localStorage.getItem(FILTERS_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setStatusFilter(parsed.statusFilter || '');
+        setBranchFilter(parsed.branchFilter || '');
+        setCustomerSearch(parsed.customerSearch || '');
+      }
+    } catch (_) { }
+
     // Load branches from store
     import('../store').then(({ useAuthStore }) => {
-      useAuthStore.getState().getBranches().then(setBranches);
+      useAuthStore.getState().getBranches()
+        .then((result) => {
+          const normalizedBranches = Array.isArray(result)
+            ? result
+            : Array.isArray(result?.branches)
+              ? result.branches
+              : Array.isArray(result?.data)
+                ? result.data
+                : [];
+          setBranches(normalizedBranches);
+        })
+        .catch(() => setBranches([]));
     });
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify({
+      statusFilter,
+      branchFilter,
+      customerSearch,
+    }));
+  }, [statusFilter, branchFilter, customerSearch]);
 
   const loadInvoices = useCallback(async () => {
     setLoading(true);
@@ -65,6 +95,13 @@ export default function InvoicesPage() {
 
   useEffect(() => { loadInvoices(); }, [loadInvoices]);
   useEffect(() => { setPage(1); }, [statusFilter, branchFilter, debouncedSearch]);
+
+  const resetFilters = () => {
+    setStatusFilter('');
+    setBranchFilter('');
+    setCustomerSearch('');
+    localStorage.removeItem(FILTERS_STORAGE_KEY);
+  };
 
   const openCreate = async () => {
     try {
@@ -209,9 +246,17 @@ export default function InvoicesPage() {
             className="w-full px-4 py-2.5 rounded-xl border-2 border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 text-sm focus:border-primary-500 transition-all appearance-none cursor-pointer outline-none font-medium"
           >
             <option value="">🏢 كل الفروع</option>
-            {branches.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
+            {(Array.isArray(branches) ? branches : []).map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
           </select>
         </div>
+
+        <button
+          type="button"
+          onClick={resetFilters}
+          className="w-full sm:w-auto px-4 py-2.5 rounded-xl border-2 border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 text-sm hover:border-primary-500 transition-all"
+        >
+          إعادة الفلاتر
+        </button>
 
         <Button
           icon={<Plus className="w-5 h-5" />}
@@ -222,7 +267,7 @@ export default function InvoicesPage() {
         </Button>
       </div>
 
-      {loading ? <LoadingSpinner /> : invoices.length === 0 ? (
+      {loading ? <OwnerTableSkeleton rows={10} columns={8} /> : invoices.length === 0 ? (
         <EmptyState
           icon={<FileText className="w-12 h-12 text-gray-300" />}
           title="لا توجد فواتير"

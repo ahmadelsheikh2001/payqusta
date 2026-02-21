@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ShoppingCart, User, Search, Menu, X } from 'lucide-react';
-import axios from 'axios';
+import { api } from '../store';
 
 export default function StorefrontLayout({ children }) {
   const [cartCount, setCartCount] = useState(0);
@@ -15,9 +15,9 @@ export default function StorefrontLayout({ children }) {
 
   const loadSettings = async () => {
     try {
-      const res = await axios.get('/api/v1/settings');
+      const res = await api.get('/settings');
       setSettings(res.data.data);
-    } catch (err) {}
+    } catch (err) { }
   };
 
   const loadCartCount = () => {
@@ -63,8 +63,8 @@ export default function StorefrontLayout({ children }) {
 
             {/* Actions */}
             <div className="flex items-center gap-4">
-              <Link 
-                to="/store/cart" 
+              <Link
+                to="/store/cart"
                 className="relative p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
               >
                 <ShoppingCart className="w-6 h-6 text-gray-700 dark:text-gray-300" />
@@ -75,7 +75,7 @@ export default function StorefrontLayout({ children }) {
                 )}
               </Link>
 
-              <button 
+              <button
                 className="md:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               >

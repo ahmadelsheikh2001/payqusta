@@ -118,7 +118,8 @@ class ExpenseController {
       amount: expense.amount,
       category: expense.category,
       createdByName: req.user.name,
-    }).catch((err) => {});
+      branchId: req.user.branch,
+    }).catch((err) => { });
 
     ApiResponse.created(res, expense, 'تم إضافة المصروف بنجاح');
   });

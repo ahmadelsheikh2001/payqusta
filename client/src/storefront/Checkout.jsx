@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { CreditCard, User, MapPin, Phone, Mail, CheckCircle, Wallet } from 'lucide-react';
-import axios from 'axios';
+import { CreditCard, User, MapPin, Phone, Mail, CheckCircle, Wallet, AlertCircle } from 'lucide-react';
+import { api } from '../store';
 import { Card, Button, Input, LoadingSpinner, Badge } from '../components/UI';
 import { notify } from '../components/AnimatedNotification';
 import { usePortalStore } from '../store/portalStore';
@@ -11,7 +11,7 @@ export default function Checkout() {
   const location = useLocation();
   const [cart, setCart] = useState([]);
   const [loading, setLoading] = useState(false);
-  
+
   // Portal Context
   const isPortal = location.pathname.includes('/portal');
   const { customer, isAuthenticated } = usePortalStore();
@@ -52,7 +52,7 @@ export default function Checkout() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!form.customerName || !form.phone) {
       notify.error('الرجاء إدخال الاسم ورقم الهاتف');
       return;
@@ -63,18 +63,18 @@ export default function Checkout() {
       if (isPortal) {
         // === PORTAL CHECKOUT FLOW ===
         const { checkout } = usePortalStore.getState(); // Assuming checkout action exists/will create
-        
+
         // We need to call the portal API
         // For now, let's call axios directly if store action not ready, or use the store
         // Let's implement checkout in portalStore or call API here
-        
-        await axios.post('/api/v1/portal/cart/checkout', {
-            items: cart.map(item => ({
-                productId: item.productId,
-                quantity: item.quantity
-            }))
+
+        await api.post('/portal/cart/checkout', {
+          items: cart.map(item => ({
+            productId: item.productId,
+            quantity: item.quantity
+          }))
         }, {
-            headers: { Authorization: `Bearer ${usePortalStore.getState().token}` }
+          headers: { Authorization: `Bearer ${usePortalStore.getState().token}` }
         });
 
         // Success
@@ -82,45 +82,45 @@ export default function Checkout() {
         window.dispatchEvent(new Event('cartUpdated'));
         notify.success('تم استلام طلبك بنجاح');
         navigate('/portal/dashboard');
-        
+
       } else {
         // === PUBLIC STORE CHECKOUT FLOW ===
         // Create customer if doesn't exist
         let customerId;
         try {
-            const customerRes = await axios.post('/api/v1/customers', {
+          const customerRes = await api.post('/customers', {
             name: form.customerName,
             phone: form.phone,
             email: form.email || undefined,
             address: form.address || undefined
-            });
-            customerId = customerRes.data.data._id;
+          });
+          customerId = customerRes.data.data._id;
         } catch (err) {
-            // Customer might already exist, search by phone
-            const searchRes = await axios.get(`/api/v1/customers?search=${form.phone}`);
-            if (searchRes.data.data.length > 0) {
+          // Customer might already exist, search by phone
+          const searchRes = await api.get(`/customers?search=${form.phone}`);
+          if (searchRes.data.data.length > 0) {
             customerId = searchRes.data.data[0]._id;
-            } else {
+          } else {
             throw err;
-            }
+          }
         }
 
         // Create invoice
         const invoiceData = {
-            customer: customerId,
-            items: cart.map(item => ({
+          customer: customerId,
+          items: cart.map(item => ({
             productId: item.productId,
             variantId: item.variant?.id,
             quantity: item.quantity,
             unitPrice: item.price,
             totalPrice: item.price * item.quantity
-            })),
-            paymentMethod: form.paymentMethod,
-            notes: form.notes,
-            source: 'online_store'
+          })),
+          paymentMethod: form.paymentMethod,
+          notes: form.notes,
+          source: 'online_store'
         };
 
-        const invoiceRes = await axios.post('/api/v1/invoices', invoiceData);
+        const invoiceRes = await api.post('/invoices', invoiceData);
         const invoice = invoiceRes.data.data;
 
         // Clear cart
@@ -129,19 +129,19 @@ export default function Checkout() {
 
         // If payment gateway selected, create payment link
         if (form.paymentMethod === 'online') {
-            const paymentRes = await axios.post('/api/v1/payments/create-link', {
+          const paymentRes = await api.post('/payments/create-link', {
             invoiceId: invoice._id,
             amount: invoice.totalAmount,
             customerName: form.customerName,
             customerPhone: form.phone,
             customerEmail: form.email
-            });
-            
-            // Redirect to payment gateway
-            window.location.href = paymentRes.data.data.paymentUrl;
+          });
+
+          // Redirect to payment gateway
+          window.location.href = paymentRes.data.data.paymentUrl;
         } else {
-            // Navigate to success page
-            navigate(`/store/order/${invoice._id}`);
+          // Navigate to success page
+          navigate(`/store/order/${invoice._id}`);
         }
       }
     } catch (err) {
@@ -212,59 +212,59 @@ export default function Checkout() {
               </h2>
               <div className="space-y-3">
                 {isPortal ? (
-                    // Portal Payment Options
-                    <label className={`flex items-center gap-3 p-4 border-2 rounded-xl cursor-pointer transition-colors ${form.paymentMethod === 'credit' ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-primary-300'}`}>
-                        <input
-                            type="radio"
-                            name="paymentMethod"
-                            value="credit"
-                            checked={form.paymentMethod === 'credit'}
-                            onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })}
-                            className="w-4 h-4"
-                        />
-                        <div className="flex-1">
-                            <div className="font-bold flex items-center gap-2">
-                                خصم من الرصيد الائتماني
-                                <Badge variant="success">موصى به</Badge>
-                            </div>
-                            <div className="text-sm text-gray-500">
-                                الرصيد المتاح: <span className="font-bold text-gray-800">{customer?.balance?.toLocaleString()} ج.م</span>
-                            </div>
-                        </div>
-                        <Wallet className="w-6 h-6 text-primary-600" />
-                    </label>
+                  // Portal Payment Options
+                  <label className={`flex items-center gap-3 p-4 border-2 rounded-xl cursor-pointer transition-colors ${form.paymentMethod === 'credit' ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-primary-300'}`}>
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value="credit"
+                      checked={form.paymentMethod === 'credit'}
+                      onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })}
+                      className="w-4 h-4"
+                    />
+                    <div className="flex-1">
+                      <div className="font-bold flex items-center gap-2">
+                        خصم من الرصيد الائتماني
+                        <Badge variant="success">موصى به</Badge>
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        الرصيد المتاح: <span className="font-bold text-gray-800">{customer?.balance?.toLocaleString()} ج.م</span>
+                      </div>
+                    </div>
+                    <Wallet className="w-6 h-6 text-primary-600" />
+                  </label>
                 ) : (
-                    // Public Store Payment Options
-                    <>
-                        <label className="flex items-center gap-3 p-4 border-2 border-gray-200 dark:border-gray-700 rounded-xl cursor-pointer hover:border-primary-500 transition-colors">
-                        <input
-                            type="radio"
-                            name="paymentMethod"
-                            value="cash"
-                            checked={form.paymentMethod === 'cash'}
-                            onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })}
-                            className="w-4 h-4"
-                        />
-                        <div>
-                            <div className="font-bold">الدفع عند الاستلام</div>
-                            <div className="text-sm text-gray-500">ادفع نقداً عند استلام الطلب</div>
-                        </div>
-                        </label>
-                        <label className="flex items-center gap-3 p-4 border-2 border-gray-200 dark:border-gray-700 rounded-xl cursor-pointer hover:border-primary-500 transition-colors">
-                        <input
-                            type="radio"
-                            name="paymentMethod"
-                            value="online"
-                            checked={form.paymentMethod === 'online'}
-                            onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })}
-                            className="w-4 h-4"
-                        />
-                        <div>
-                            <div className="font-bold">الدفع الإلكتروني</div>
-                            <div className="text-sm text-gray-500">ادفع الآن عبر بوابة الدفع الآمنة</div>
-                        </div>
-                        </label>
-                    </>
+                  // Public Store Payment Options
+                  <>
+                    <label className="flex items-center gap-3 p-4 border-2 border-gray-200 dark:border-gray-700 rounded-xl cursor-pointer hover:border-primary-500 transition-colors">
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        value="cash"
+                        checked={form.paymentMethod === 'cash'}
+                        onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })}
+                        className="w-4 h-4"
+                      />
+                      <div>
+                        <div className="font-bold">الدفع عند الاستلام</div>
+                        <div className="text-sm text-gray-500">ادفع نقداً عند استلام الطلب</div>
+                      </div>
+                    </label>
+                    <label className="flex items-center gap-3 p-4 border-2 border-gray-200 dark:border-gray-700 rounded-xl cursor-pointer hover:border-primary-500 transition-colors">
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        value="online"
+                        checked={form.paymentMethod === 'online'}
+                        onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })}
+                        className="w-4 h-4"
+                      />
+                      <div>
+                        <div className="font-bold">الدفع الإلكتروني</div>
+                        <div className="text-sm text-gray-500">ادفع الآن عبر بوابة الدفع الآمنة</div>
+                      </div>
+                    </label>
+                  </>
                 )}
               </div>
             </Card>
@@ -274,7 +274,7 @@ export default function Checkout() {
           <div className="lg:col-span-1">
             <Card className="p-6 sticky top-20">
               <h2 className="text-xl font-bold mb-4">ملخص الطلب</h2>
-              
+
               <div className="space-y-3 mb-4 max-h-60 overflow-y-auto">
                 {cart.map((item, index) => (
                   <div key={index} className="flex justify-between text-sm">
@@ -308,13 +308,13 @@ export default function Checkout() {
                   <span className="font-black text-primary-600 text-2xl">{total.toFixed(2)} ج.م</span>
                 </div>
               </div>
-              
+
               {/* Portal Balance Check */}
               {isPortal && customer && total > (customer.balance || 0) && (
-                 <div className="mt-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg flex gap-2">
-                    <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                    <span>رصيدك الحالي لا يكفي لإتمام عملية الشراء هذه.</span>
-                 </div>
+                <div className="mt-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg flex gap-2">
+                  <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                  <span>رصيدك الحالي لا يكفي لإتمام عملية الشراء هذه.</span>
+                </div>
               )}
 
               <Button
