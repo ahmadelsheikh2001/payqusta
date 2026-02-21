@@ -68,6 +68,7 @@ const userSchema = new mongoose.Schema(
     }],
     avatar: { type: String, default: null },
     isActive: { type: Boolean, default: true },
+    sessionVersion: { type: Number, default: 0 }, // Incremented to invalidate all sessions
     twoFactorEnabled: { type: Boolean, default: false },
     twoFactorSecret: { type: String, select: false },
     lastLogin: { type: Date },
@@ -84,7 +85,6 @@ const userSchema = new mongoose.Schema(
         id: String,
         awardedAt: { type: Date, default: Date.now }
       }],
-      streak: { type: Number, default: 0 },
       streak: { type: Number, default: 0 },
       lastSaleDate: { type: Date }
     },
@@ -123,6 +123,7 @@ userSchema.methods.generateAuthToken = function () {
       id: this._id,
       role: this.role,
       tenant: this.tenant,
+      sv: this.sessionVersion || 0,
     },
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRE || '7d' }

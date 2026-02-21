@@ -6,7 +6,7 @@ import {
   AlertTriangle, ChevronDown, ChevronLeft, Boxes, Clock,
   PieChart, TrendingUp, Crown, Building2, Shield, Activity,
   Upload, Database, Archive, DollarSign, ShoppingCart, Video,
-  ShoppingBag, RefreshCcw, MessageCircle, FileCheck,
+  ShoppingBag, RefreshCcw, MessageCircle, FileCheck, Star, Tag,
 } from 'lucide-react';
 import { useAuthStore } from '../store';
 
@@ -80,8 +80,8 @@ export default function Sidebar({ open, onClose }) {
     <button
       onClick={onClick}
       className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${isActive
-          ? 'bg-primary-50 dark:bg-primary-500/10 text-primary-600 dark:text-primary-400 shadow-sm'
-          : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50 hover:text-gray-700 dark:hover:text-gray-300'
+        ? 'bg-primary-50 dark:bg-primary-500/10 text-primary-600 dark:text-primary-400 shadow-sm'
+        : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50 hover:text-gray-700 dark:hover:text-gray-300'
         }`}
     >
       <div className="flex items-center gap-3">
@@ -173,12 +173,16 @@ export default function Sidebar({ open, onClose }) {
 
         <NavItem to="/customers" icon={Users} label="العملاء" />
         <NavItem to="/invoices" icon={FileText} label="الفواتير" />
-        <NavItem to="/portal-orders" icon={ShoppingBag} label="طلبات البوابة" />
+        {(user?.role === 'admin' || user?.isSuperAdmin) && (
+          <NavItem to="/portal-orders" icon={ShoppingBag} label="طلبات البوابة" />
+        )}
         {(user?.role === 'admin' || user?.role === 'vendor') && (
           <>
             <NavItem to="/returns-management" icon={RefreshCcw} label="المرتجعات" />
             <NavItem to="/kyc-review" icon={FileCheck} label="مستندات العملاء" />
             <NavItem to="/support-messages" icon={MessageCircle} label="رسائل الدعم" />
+            <NavItem to="/reviews" icon={Star} label="التقييمات" />
+            <NavItem to="/coupons" icon={Tag} label="كوبونات الخصم" />
           </>
         )}
         <NavItem to="/suppliers" icon={Truck} label="الموردين" />

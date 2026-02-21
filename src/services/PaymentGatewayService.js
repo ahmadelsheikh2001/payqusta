@@ -39,7 +39,7 @@ class PaymentGatewayService {
     }
 
     // Calculate amounts
-    const paymentAmount = amount || invoice.totalAmount - invoice.amountPaid;
+    const paymentAmount = amount || invoice.totalAmount - invoice.paidAmount;
     let discount = 0;
     
     if (applyDiscount) {
@@ -405,18 +405,18 @@ class PaymentGatewayService {
 
     // Add payment amount (minus discount)
     const paidAmount = transaction.amount - transaction.discount;
-    invoice.amountPaid += paidAmount;
-    
+    invoice.paidAmount += paidAmount;
+
     // Update status
-    if (invoice.amountPaid >= invoice.totalAmount) {
+    if (invoice.paidAmount >= invoice.totalAmount) {
       invoice.status = 'paid';
-    } else if (invoice.amountPaid > 0) {
+    } else if (invoice.paidAmount > 0) {
       invoice.status = 'partially_paid';
     }
 
     await invoice.save();
-    
-    logger.info(`Invoice ${invoice.invoiceNumber} updated. Paid: ${invoice.amountPaid}/${invoice.totalAmount}`);
+
+    logger.info(`Invoice ${invoice.invoiceNumber} updated. Paid: ${invoice.paidAmount}/${invoice.totalAmount}`);
 
     // TODO: Send WhatsApp notification
   }

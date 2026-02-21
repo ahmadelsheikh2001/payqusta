@@ -154,6 +154,10 @@ const invoiceSchema = new mongoose.Schema(
       governorate: { type: String },
       notes: { type: String },
     },
+    // Electronic Signature (For portal credit/installment orders)
+    electronicSignature: {
+      type: String,
+    },
   },
   {
     timestamps: true,

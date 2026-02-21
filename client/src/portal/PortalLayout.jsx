@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { usePortalStore } from '../store/portalStore';
 import { useThemeStore } from '../store';
-import { ShoppingCart, LogOut, Home, Grid, User, Wallet, Receipt, FileText, Sun, Moon, Package, Bell, Heart, MessageCircle, X, Trash2, Calculator, RefreshCcw, MapPin, Award } from 'lucide-react';
+import { ShoppingCart, LogOut, Home, Grid, User, Wallet, Receipt, FileText, Sun, Moon, Package, Bell, Heart, MessageCircle, X, Trash2, Calculator, RefreshCcw, MapPin, Award, Star } from 'lucide-react';
 
 export default function PortalLayout() {
   const { customer, logout, isAuthenticated, fetchDashboard, cart, isCartOpen, toggleCart, removeFromCart, unreadCount, fetchUnreadCount } = usePortalStore();
@@ -47,6 +47,7 @@ export default function PortalLayout() {
     { icon: Receipt, label: 'فواتيري', path: '/portal/invoices' },
     { icon: RefreshCcw, label: 'المرتجعات', path: '/portal/returns' },
     { icon: Award, label: 'النقاط', path: '/portal/points' },
+    { icon: Star, label: 'تقييماتي', path: '/portal/reviews' },
     { icon: Calculator, label: 'حاسبة الأقساط', path: '/portal/calculator' },
     { icon: FileText, label: 'المستندات', path: '/portal/documents' },
     { icon: MapPin, label: 'العناوين', path: '/portal/addresses' },
@@ -167,9 +168,50 @@ export default function PortalLayout() {
         </header>
 
         {/* ═══════════════ MAIN CONTENT ═══════════════ */}
-        <main className="flex-1 p-4 w-full max-w-7xl mx-auto">
-          <Outlet />
-        </main>
+        <div className="flex-1 w-full max-w-7xl mx-auto flex">
+          {/* Desktop Sidebar Navigation */}
+          <aside className="hidden md:block w-64 p-4 shrink-0">
+            <div className="sticky top-24 bg-white dark:bg-gray-900 rounded-3xl p-4 border border-gray-100 dark:border-gray-800 shadow-sm space-y-2">
+              <h3 className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-4 px-2">
+                القائمة الرئيسية
+              </h3>
+              {navItems.map((item) => {
+                if (item.isCart) return null; // Cart is handled in header
+                const active = isActive(item.path);
+                return (
+                  <button
+                    key={item.path}
+                    onClick={() => navigate(item.path)}
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl transition-all group ${active
+                      ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 font-bold'
+                      : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white font-medium'
+                      }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-xl transition-colors ${active
+                        ? 'bg-primary-100 dark:bg-primary-900/30'
+                        : 'bg-gray-100 dark:bg-gray-800 group-hover:bg-white dark:group-hover:bg-gray-700'
+                        }`}>
+                        <item.icon className={`w-5 h-5 ${active ? 'fill-current/20' : ''}`} />
+                      </div>
+                      <span className="text-sm">{item.label}</span>
+                    </div>
+                    {item.badge > 0 && (
+                      <span className="w-5 h-5 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full">
+                        {item.badge}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </aside>
+
+          {/* Page Content */}
+          <main className="flex-1 p-4 w-full min-w-0">
+            <Outlet />
+          </main>
+        </div>
 
         {/* ═══════════════ MOBILE NAV ═══════════════ */}
         <nav className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 md:hidden z-20 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] pb-safe">
@@ -220,6 +262,26 @@ export default function PortalLayout() {
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
+
+            {/* ═══════════════ UPSELLING BANNER ═══════════════ */}
+            {cart.length > 0 && cartTotal < 1000 && (
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/10 dark:to-indigo-900/10 border border-blue-100 dark:border-blue-800/30 rounded-2xl p-3 flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-800/30 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0 mt-0.5">
+                  <Package className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-gray-900 dark:text-white">شحن مجاني!</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                    أضف منتجات بقيمة {(1000 - cartTotal).toLocaleString()} ج.م إضافية للحصول على شحن مجاني
+                  </p>
+                  {/* Progress Bar */}
+                  <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full mt-2 overflow-hidden">
+                    <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: `${(cartTotal / 1000) * 100}%` }} />
+                  </div>
+                </div>
+              </div>
+            )}
+
             {cart.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center opacity-60">
                 <div className="w-20 h-20 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  User, Mail, Phone, Building2, Clock, Edit3, Save, Lock, Eye, EyeOff, 
-  Camera, Loader2, Trash2, Shield, Calendar, CheckCircle 
+import {
+  User, Mail, Phone, Building2, Clock, Edit3, Save, Lock, Eye, EyeOff,
+  Camera, Loader2, Trash2, Shield, Calendar, CheckCircle, LogOut
 } from 'lucide-react';
 import { useAuthStore, useThemeStore, api } from '../../store';
 import { Button } from '../UI';
@@ -27,7 +27,7 @@ const InfoCard = ({ icon: Icon, label, value, color, dark }) => (
 );
 
 export default function SettingsProfile() {
-  const { user, tenant, getMe } = useAuthStore();
+  const { user, tenant, getMe, logoutAll } = useAuthStore();
   const { dark } = useThemeStore();
   
   const [userForm, setUserForm] = useState({ name: '', email: '', phone: '' });
@@ -325,6 +325,42 @@ export default function SettingsProfile() {
           <InfoCard icon={CheckCircle} label="حالة الحساب" value={user?.isActive ? 'نشط' : 'معطل'} color={user?.isActive ? 'emerald' : 'red'} dark={dark} />
           <InfoCard icon={Clock} label="آخر تسجيل دخول" value={formatDate(user?.lastLogin)} color="gray" dark={dark} />
           <InfoCard icon={Calendar} label="تاريخ الانضمام" value={formatDate(user?.createdAt)} color="gray" dark={dark} />
+        </div>
+      </div>
+
+      {/* Session Security */}
+      <div className="pt-6 border-t border-gray-100 dark:border-gray-800">
+        <div className="flex items-center gap-2 mb-4">
+          <LogOut className="w-5 h-5 text-red-500" />
+          <h3 className="font-bold text-lg">أمان الجلسات</h3>
+        </div>
+        <div className={`p-4 rounded-xl border ${dark ? 'bg-gray-800 border-gray-700' : 'bg-red-50 border-red-100'}`}>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            تسجيل الخروج من جميع الأجهزة المتصلة بحسابك. سيتم إلغاء جميع الجلسات النشطة وستحتاج إلى تسجيل الدخول مرة أخرى.
+          </p>
+          <Button
+            variant="danger"
+            icon={<LogOut className="w-4 h-4" />}
+            onClick={() => {
+              notify.custom({
+                title: 'تسجيل الخروج من كل الأجهزة',
+                message: 'سيتم إنهاء جميع الجلسات النشطة. هل أنت متأكد؟',
+                type: 'warning',
+                actions: [
+                  {
+                    label: 'تسجيل الخروج من الكل',
+                    onClick: async () => {
+                      await logoutAll();
+                    },
+                    style: 'danger',
+                  },
+                  { label: 'إلغاء', onClick: () => {}, style: 'secondary' },
+                ],
+              });
+            }}
+          >
+            تسجيل الخروج من جميع الأجهزة
+          </Button>
         </div>
       </div>
     </div>

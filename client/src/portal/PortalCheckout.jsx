@@ -25,7 +25,7 @@ const STEPS = [
 
 export default function PortalCheckout() {
     const navigate = useNavigate();
-    const { cart, customer, checkout, clearCart } = usePortalStore();
+    const { cart, customer, checkout, clearCart, validateCoupon } = usePortalStore();
 
     const [step, setStep] = useState('shipping');
     const [loading, setLoading] = useState(false);
@@ -39,12 +39,42 @@ export default function PortalCheckout() {
         city: '',
         governorate: '',
         notes: '',
+        signature: '',
     });
 
     const [errors, setErrors] = useState({});
 
-    const total = cart.reduce((s, i) => s + (i.price * i.quantity), 0);
+    // Coupon state
+    const [couponCode, setCouponCode] = useState('');
+    const [couponData, setCouponData] = useState(null);
+    const [couponLoading, setCouponLoading] = useState(false);
+    const [couponError, setCouponError] = useState('');
+
+    const subtotal = cart.reduce((s, i) => s + (i.price * i.quantity), 0);
+    const discount = couponData ? couponData.discountAmount : 0;
+    const total = Math.max(0, subtotal - discount);
     const creditAvailable = Math.max(0, (customer?.creditLimit || 0) - (customer?.outstandingBalance || 0));
+
+    const handleApplyCoupon = async () => {
+        if (!couponCode.trim()) return;
+        setCouponLoading(true);
+        setCouponError('');
+        const res = await validateCoupon(couponCode.trim().toUpperCase(), subtotal);
+        setCouponLoading(false);
+        if (res.success) {
+            setCouponData(res.data);
+            notify.success(`تم تطبيق الكوبون! وفرت ${res.data.discountAmount?.toLocaleString()} ج.م`);
+        } else {
+            setCouponError(res.message);
+            setCouponData(null);
+        }
+    };
+
+    const handleRemoveCoupon = () => {
+        setCouponCode('');
+        setCouponData(null);
+        setCouponError('');
+    };
 
     const validate = () => {
         const e = {};
@@ -64,6 +94,7 @@ export default function PortalCheckout() {
 
     const handleSubmit = async () => {
         if (cart.length === 0) { notify.error('السلة فارغة'); return; }
+        if (!form.signature.trim()) { notify.error('يرجى إدخال التوقيع الإلكتروني'); return; }
         setLoading(true);
         try {
             const items = cart.map(i => ({
@@ -78,7 +109,7 @@ export default function PortalCheckout() {
                 city: form.city,
                 governorate: form.governorate,
                 notes: form.notes,
-            });
+            }, form.notes, form.signature, couponData?.coupon?.code);
 
             if (res.success) {
                 setOrderId(res.data.orderId);
@@ -123,7 +154,10 @@ export default function PortalCheckout() {
                     </div>
                     <div className="flex justify-between text-sm">
                         <span className="text-gray-500">الإجمالي</span>
-                        <span className="font-black text-primary-600">{total.toLocaleString()} ج.م</span>
+                        <span className="font-black text-primary-600">
+                            {total.toLocaleString()} ج.م
+                            {discount > 0 && <span className="text-xs text-green-500 mr-1 font-normal">(وفرت {discount.toLocaleString()})</span>}
+                        </span>
                     </div>
                 </div>
 
@@ -157,7 +191,7 @@ export default function PortalCheckout() {
                 </button>
                 <div>
                     <h2 className="text-lg font-black text-gray-900 dark:text-white">إتمام الطلب</h2>
-                    <p className="text-xs text-gray-400">{cart.length} منتج • {total.toLocaleString()} ج.م</p>
+                    <p className="text-xs text-gray-400">{cart.length} منتج • {total.toLocaleString()} ج.م{discount > 0 && <span className="text-green-500 mr-1">(وفرت {discount.toLocaleString()} ج.م)</span>}</p>
                 </div>
             </div>
 
@@ -252,6 +286,46 @@ export default function PortalCheckout() {
                         </div>
                     </div>
 
+                    {/* Coupon Code */}
+                    <div className="bg-white dark:bg-gray-800/90 rounded-2xl p-5 border border-gray-100 dark:border-gray-700">
+                        <h3 className="font-bold text-gray-800 dark:text-white text-sm flex items-center gap-2 mb-3">
+                            <Tag className="w-4 h-4 text-primary-500" /> كوبون الخصم
+                        </h3>
+                        {couponData ? (
+                            <div className="flex items-center justify-between bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl px-4 py-3">
+                                <div>
+                                    <p className="font-bold text-green-700 dark:text-green-400 text-sm">{couponData.coupon?.code}</p>
+                                    <p className="text-xs text-green-600 dark:text-green-500">خصم {couponData.discountAmount?.toLocaleString()} ج.م</p>
+                                </div>
+                                <button onClick={handleRemoveCoupon} className="p-1.5 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition">
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="space-y-2">
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={couponCode}
+                                        onChange={e => { setCouponCode(e.target.value.toUpperCase()); setCouponError(''); }}
+                                        onKeyDown={e => e.key === 'Enter' && handleApplyCoupon()}
+                                        placeholder="أدخل كود الخصم"
+                                        className="flex-1 px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-primary-500 transition-all"
+                                        dir="ltr"
+                                    />
+                                    <button
+                                        onClick={handleApplyCoupon}
+                                        disabled={couponLoading || !couponCode.trim()}
+                                        className="px-4 py-3 rounded-xl bg-primary-500 text-white font-bold text-sm hover:bg-primary-600 transition disabled:opacity-50 flex items-center gap-1.5"
+                                    >
+                                        {couponLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'تطبيق'}
+                                    </button>
+                                </div>
+                                {couponError && <p className="text-red-500 text-[11px]">{couponError}</p>}
+                            </div>
+                        )}
+                    </div>
+
                     <button
                         onClick={handleNext}
                         disabled={total > creditAvailable}
@@ -289,6 +363,20 @@ export default function PortalCheckout() {
                                 <p className="font-black text-sm text-primary-600">{(item.price * item.quantity).toLocaleString()} ج.م</p>
                             </div>
                         ))}
+                        {discount > 0 && (
+                            <div className="px-5 py-3 bg-gray-50 dark:bg-gray-900/30 flex justify-between items-center border-t border-gray-100 dark:border-gray-700">
+                                <span className="text-sm text-gray-500 dark:text-gray-400">المجموع الفرعي</span>
+                                <span className="text-sm text-gray-600 dark:text-gray-400">{subtotal.toLocaleString()} ج.م</span>
+                            </div>
+                        )}
+                        {discount > 0 && (
+                            <div className="px-5 py-3 bg-green-50 dark:bg-green-900/10 flex justify-between items-center">
+                                <span className="text-sm font-bold text-green-700 dark:text-green-400 flex items-center gap-1.5">
+                                    <Tag className="w-3.5 h-3.5" /> خصم ({couponData?.coupon?.code})
+                                </span>
+                                <span className="text-sm font-bold text-green-600">-{discount.toLocaleString()} ج.م</span>
+                            </div>
+                        )}
                         <div className="px-5 py-4 bg-gray-50 dark:bg-gray-900/30 flex justify-between items-center">
                             <span className="font-bold text-gray-700 dark:text-gray-300">الإجمالي</span>
                             <span className="font-black text-xl text-primary-600">{total.toLocaleString()} ج.م</span>
@@ -331,7 +419,35 @@ export default function PortalCheckout() {
                         <Building2 className="w-5 h-5 flex-shrink-0 mt-0.5" />
                         <div>
                             <p className="font-bold mb-1">الدفع الآجل</p>
-                            <p className="text-xs text-blue-600 dark:text-blue-500">سيتم إضافة {total.toLocaleString()} ج.م للحساب المؤجل وفق خطة التقسيط المتفق عليها</p>
+                            <p className="text-xs text-blue-600 dark:text-blue-500">سيتم إضافة {total.toLocaleString()} ج.م للحساب المؤجل وفق خطة التقسيط المتفق عليها{discount > 0 && ` (بعد خصم ${discount.toLocaleString()} ج.م)`}</p>
+                        </div>
+                    </div>
+
+                    {/* Basic Documents Required File Verification Message */}
+                    <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-2xl p-4 text-sm text-orange-700 dark:text-orange-400 flex items-start gap-3">
+                        <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                        <div>
+                            <p className="font-bold mb-1">المستندات الأساسية لحسابك</p>
+                            <p className="text-xs text-orange-600 dark:text-orange-500 mt-0.5 leading-relaxed">
+                                لضمان سرعة معالجة الطلب، يُرجى التأكد من تقديم مستنداتك الأساسية للإدارة (مثل البطاقة الشخصية وإيصال مرافق) إما تسليمها يدوياً أو رفعها عبر صفحة "المستندات".
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Electronic Signature */}
+                    <div className="bg-white dark:bg-gray-800/90 rounded-2xl p-5 border border-gray-100 dark:border-gray-700">
+                        <h3 className="font-bold text-gray-800 dark:text-white text-sm mb-3">التوقيع الإلكتروني</h3>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 px-1">
+                            أقر أنا بكامل ارادتي بصحة البيانات المكتوبة وأوافق على شروط الشراء الآجل وإدارة الأقساط.
+                        </p>
+                        <div className="relative">
+                            <input
+                                type="text"
+                                value={form.signature}
+                                onChange={(e) => setForm({ ...form, signature: e.target.value })}
+                                placeholder="اكتب اسمك الثلاثي للتوقيع هنا"
+                                className={inputClass('signature')}
+                            />
                         </div>
                     </div>
 

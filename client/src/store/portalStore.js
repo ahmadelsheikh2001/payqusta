@@ -357,6 +357,18 @@ export const usePortalStore = create((set, get) => ({
     }
   },
 
+  cancelOrder: async (id) => {
+    set({ loading: true });
+    try {
+      const res = await portalApi.post(`/portal/orders/${id}/cancel`);
+      set({ loading: false });
+      return { success: true, message: res.data.message };
+    } catch (err) {
+      set({ loading: false });
+      return { success: false, message: err.response?.data?.message || 'فشل إلغاء الطلب' };
+    }
+  },
+
   reorder: async (orderId) => {
     try {
       const res = await portalApi.post(`/portal/orders/${orderId}/reorder`);
@@ -381,13 +393,11 @@ export const usePortalStore = create((set, get) => ({
   },
 
   // Checkout (place order with shipping details)
-  checkout: async (items, shippingAddress, notes) => {
+  checkout: async (items, shippingAddress, notes, signature, couponCode) => {
     try {
-      const res = await portalApi.post('/portal/cart/checkout', {
-        items,
-        shippingAddress,
-        notes,
-      });
+      const body = { items, shippingAddress, notes, signature };
+      if (couponCode) body.couponCode = couponCode;
+      const res = await portalApi.post('/portal/cart/checkout', body);
       return { success: true, data: res.data.data, message: res.data.message };
     } catch (err) {
       return { success: false, message: err.response?.data?.message || 'فشل إنشاء الطلب' };
@@ -488,6 +498,36 @@ export const usePortalStore = create((set, get) => ({
     } catch (err) {
       set({ loading: false });
       return { success: false, message: err.response?.data?.message || 'فشل إرسال الرسالة' };
+    }
+  },
+
+  fetchSupportMessages: async () => {
+    try {
+      const res = await portalApi.get('/portal/support');
+      return res.data.data;
+    } catch (err) {
+      return [];
+    }
+  },
+
+  fetchSupportMessageById: async (id) => {
+    try {
+      const res = await portalApi.get(`/portal/support/${id}`);
+      return res.data.data;
+    } catch (err) {
+      return null;
+    }
+  },
+
+  replyToSupportMessage: async (id, message) => {
+    set({ loading: true });
+    try {
+      const res = await portalApi.post(`/portal/support/${id}/reply`, { message });
+      set({ loading: false });
+      return { success: true, message: res.data.message, data: res.data.data };
+    } catch (err) {
+      set({ loading: false });
+      return { success: false, message: err.response?.data?.message || 'فشل إرسال الرد' };
     }
   },
 
@@ -639,6 +679,46 @@ export const usePortalStore = create((set, get) => ({
       return res.data.data;
     } catch (err) {
       return null;
+    }
+  },
+
+  // ═══════════════ REVIEWS ═══════════════
+
+  submitReview: async (data) => {
+    try {
+      const res = await portalApi.post('/portal/reviews', data);
+      return { success: true, data: res.data.data, message: res.data.message };
+    } catch (err) {
+      return { success: false, message: err.response?.data?.message || 'فشل إرسال التقييم' };
+    }
+  },
+
+  fetchMyReviews: async () => {
+    try {
+      const res = await portalApi.get('/portal/reviews');
+      return res.data.data;
+    } catch (err) {
+      return null;
+    }
+  },
+
+  fetchStoreReviews: async (page = 1) => {
+    try {
+      const res = await portalApi.get('/portal/reviews/store', { params: { page } });
+      return res.data.data;
+    } catch (err) {
+      return null;
+    }
+  },
+
+  // ═══════════════ COUPONS ═══════════════
+
+  validateCoupon: async (code, orderTotal) => {
+    try {
+      const res = await portalApi.post('/portal/coupons/validate', { code, orderTotal });
+      return { success: true, data: res.data.data, message: res.data.message };
+    } catch (err) {
+      return { success: false, message: err.response?.data?.message || 'كوبون غير صالح' };
     }
   },
 }));

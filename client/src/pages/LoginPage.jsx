@@ -5,8 +5,8 @@ import toast from 'react-hot-toast';
 import { useAuthStore, useThemeStore } from '../store';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('vendor@payqusta.com');
-  const [password, setPassword] = useState('123456');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [isRegister, setIsRegister] = useState(false);
   const [registerData, setRegisterData] = useState({ name: '', storeName: '', phone: '' });

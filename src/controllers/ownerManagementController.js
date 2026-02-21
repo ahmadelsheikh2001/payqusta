@@ -126,6 +126,7 @@ class OwnerManagementController {
       message: `طلب المرتجع الخاص بك: ${labels[status]}${adminNotes ? `. ${adminNotes}` : ''}`,
       icon: status === 'approved' ? 'check-circle' : status === 'rejected' ? 'x-circle' : 'package',
       color: status === 'approved' ? 'success' : status === 'rejected' ? 'danger' : 'primary',
+      link: '/portal/returns'
     });
 
     ApiResponse.success(res, returnReq, 'تم تحديث طلب المرتجع');
@@ -239,6 +240,7 @@ class OwnerManagementController {
         : `تم رفض ${typeLabels[doc.type] || 'المستند'}: ${rejectionReason || 'يرجى إعادة الرفع'}`,
       icon: status === 'approved' ? 'check-circle' : 'x-circle',
       color: status === 'approved' ? 'success' : 'danger',
+      link: '/portal/documents'
     });
 
     ApiResponse.success(res, { document: doc }, `تم ${status === 'approved' ? 'قبول' : 'رفض'} المستند`);
@@ -337,6 +339,8 @@ class OwnerManagementController {
       message: `تم الرد على رسالتك "${supportMsg.subject}": ${message.substring(0, 150)}`,
       icon: 'message-circle',
       color: 'primary',
+      link: `/portal/support/${supportMsg._id}`,
+      relatedId: supportMsg._id
     });
 
     ApiResponse.success(res, supportMsg, 'تم إرسال الرد');
@@ -357,6 +361,19 @@ class OwnerManagementController {
     supportMsg.closedAt = new Date();
     supportMsg.closedBy = req.user._id;
     await supportMsg.save();
+
+    // Notify customer
+    await Notification.create({
+      tenant: req.user.tenant,
+      customerRecipient: supportMsg.customer,
+      type: 'system',
+      title: 'إغلاق تذكرة لدعم',
+      message: `تم إغلاق تذكرة الدعم "${supportMsg.subject}".`,
+      icon: 'check-circle',
+      color: 'success',
+      link: `/portal/support/${supportMsg._id}`,
+      relatedId: supportMsg._id
+    });
 
     ApiResponse.success(res, supportMsg, 'تم إغلاق التذكرة');
   });

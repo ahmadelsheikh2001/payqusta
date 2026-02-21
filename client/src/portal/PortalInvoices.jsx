@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { usePortalStore } from '../store/portalStore';
 import { useThemeStore } from '../store';
-import { Receipt, Eye, X, Calendar, CreditCard, Clock, CheckCircle, AlertTriangle, ChevronLeft, ChevronRight, Filter, Download, RefreshCcw } from 'lucide-react';
+import { Receipt, Eye, X, Calendar, CreditCard, Clock, CheckCircle, AlertTriangle, ChevronLeft, ChevronRight, Filter, Download, RefreshCcw, DollarSign } from 'lucide-react';
 import { notify } from '../components/AnimatedNotification';
 
 
@@ -13,7 +13,7 @@ const statusConfig = {
 };
 
 export default function PortalInvoices() {
-  const { fetchInvoices, fetchInvoiceDetails, downloadInvoicePDF, createReturnRequest } = usePortalStore();
+  const { fetchInvoices, fetchInvoiceDetails, downloadInvoicePDF, createReturnRequest, payInvoice } = usePortalStore();
 
   const { dark } = useThemeStore();
   const [invoices, setInvoices] = useState([]);
@@ -22,6 +22,13 @@ export default function PortalInvoices() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
+
+  // Payment State
+  const [payModalOpen, setPayModalOpen] = useState(false);
+  const [payAmount, setPayAmount] = useState('');
+  const [payMethod, setPayMethod] = useState('cash');
+  const [payNotes, setPayNotes] = useState('');
+  const [payLoading, setPayLoading] = useState(false);
 
   // Return Request State
   const [returnItem, setReturnItem] = useState(null);
@@ -237,6 +244,22 @@ export default function PortalInvoices() {
                     </div>
                   </div>
 
+                  {/* Pay Now Button */}
+                  {selectedInvoice.remainingAmount > 0 && (
+                    <button
+                      onClick={() => {
+                        setPayAmount(String(selectedInvoice.remainingAmount));
+                        setPayMethod('cash');
+                        setPayNotes('');
+                        setPayModalOpen(true);
+                      }}
+                      className="w-full py-3 bg-primary-500 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-primary-600 transition shadow-lg shadow-primary-500/20"
+                    >
+                      <DollarSign className="w-5 h-5" />
+                      سداد المبلغ ({selectedInvoice.remainingAmount?.toLocaleString()} ج.م)
+                    </button>
+                  )}
+
                   {/* Items Table */}
                   <div>
                     <h4 className="font-bold text-gray-900 dark:text-white mb-2 text-sm">المنتجات</h4>
@@ -335,6 +358,100 @@ export default function PortalInvoices() {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Payment Modal */}
+      {payModalOpen && selectedInvoice && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-900 w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden">
+            <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
+              <h3 className="font-bold text-lg text-gray-900 dark:text-white flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-primary-500" />
+                سداد الفاتورة #{selectedInvoice.invoiceNumber}
+              </h3>
+              <button onClick={() => setPayModalOpen(false)} disabled={payLoading} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="bg-primary-50 dark:bg-primary-900/20 rounded-xl p-3 text-center">
+                <p className="text-xs text-gray-500 dark:text-gray-400">المبلغ المتبقي</p>
+                <p className="text-2xl font-black text-primary-600 dark:text-primary-400">{selectedInvoice.remainingAmount?.toLocaleString()} ج.م</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">المبلغ المراد سداده</label>
+                <input
+                  type="number"
+                  min="1"
+                  max={selectedInvoice.remainingAmount}
+                  value={payAmount}
+                  onChange={(e) => setPayAmount(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:border-primary-500 focus:outline-none transition text-center text-lg font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">طريقة الدفع</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: 'cash', label: 'كاش' },
+                    { value: 'card', label: 'بطاقة' },
+                    { value: 'transfer', label: 'تحويل' },
+                  ].map((m) => (
+                    <button
+                      key={m.value}
+                      onClick={() => setPayMethod(m.value)}
+                      className={`py-2 rounded-xl text-sm font-bold transition ${payMethod === m.value
+                        ? 'bg-primary-500 text-white shadow-md'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">ملاحظات (اختياري)</label>
+                <input
+                  type="text"
+                  value={payNotes}
+                  onChange={(e) => setPayNotes(e.target.value)}
+                  placeholder="أي ملاحظات..."
+                  className="w-full px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:border-primary-500 focus:outline-none transition"
+                />
+              </div>
+
+              <button
+                onClick={async () => {
+                  const amount = parseFloat(payAmount);
+                  if (!amount || amount <= 0 || amount > selectedInvoice.remainingAmount) {
+                    notify.error('يرجى إدخال مبلغ صحيح');
+                    return;
+                  }
+                  setPayLoading(true);
+                  const res = await payInvoice(selectedInvoice._id, amount, payMethod, payNotes);
+                  setPayLoading(false);
+                  if (res.success) {
+                    notify.success('تم السداد بنجاح!');
+                    setPayModalOpen(false);
+                    setSelectedInvoice(null);
+                    loadInvoices(pagination.page, statusFilter);
+                  } else {
+                    notify.error(res.message || 'فشل السداد');
+                  }
+                }}
+                disabled={payLoading}
+                className="w-full py-3 bg-primary-500 text-white rounded-xl font-bold hover:bg-primary-600 transition shadow-lg shadow-primary-500/20 disabled:opacity-50"
+              >
+                {payLoading ? 'جاري السداد...' : `تأكيد السداد (${parseFloat(payAmount || 0).toLocaleString()} ج.م)`}
+              </button>
+            </div>
           </div>
         </div>
       )}

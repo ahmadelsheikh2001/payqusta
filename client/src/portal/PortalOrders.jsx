@@ -29,13 +29,14 @@ const trackingSteps = [
 const stepOrder = trackingSteps.map(s => s.key);
 
 export default function PortalOrders() {
-    const { fetchOrders, fetchOrderDetails, reorder } = usePortalStore();
+    const { fetchOrders, fetchOrderDetails, reorder, cancelOrder } = usePortalStore();
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [statusFilter, setStatusFilter] = useState('all');
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [detailsLoading, setDetailsLoading] = useState(false);
     const [reordering, setReordering] = useState(null);
+    const [cancelling, setCancelling] = useState(null);
 
     useEffect(() => {
         loadOrders();
@@ -61,6 +62,19 @@ export default function PortalOrders() {
         if (res.success) notify.success(res.message);
         else notify.error(res.message);
         setReordering(null);
+    };
+
+    const handleCancel = async (id) => {
+        if (!window.confirm('هل أنت متأكد من رغبتك في إلغاء هذا الطلب؟')) return;
+        setCancelling(id);
+        const res = await cancelOrder(id);
+        if (res.success) {
+            notify.success('تم إلغاء الطلب بنجاح');
+            loadOrders();
+        } else {
+            notify.error(res.message);
+        }
+        setCancelling(null);
     };
 
     const filters = [
@@ -91,8 +105,8 @@ export default function PortalOrders() {
                         key={f.value}
                         onClick={() => setStatusFilter(f.value)}
                         className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all ${statusFilter === f.value
-                                ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/30'
-                                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700'
+                            ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/30'
+                            : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700'
                             }`}
                     >
                         {f.label}
@@ -145,8 +159,8 @@ export default function PortalOrders() {
                                             <React.Fragment key={step.key}>
                                                 <div className="flex flex-col items-center min-w-0">
                                                     <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${idx <= currentStepIdx
-                                                            ? 'bg-primary-500 text-white'
-                                                            : 'bg-gray-200 dark:bg-gray-700 text-gray-400'
+                                                        ? 'bg-primary-500 text-white'
+                                                        : 'bg-gray-200 dark:bg-gray-700 text-gray-400'
                                                         }`}>
                                                         {idx < currentStepIdx ? '✓' : idx + 1}
                                                     </div>
@@ -196,6 +210,19 @@ export default function PortalOrders() {
                                                 <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                             ) : (
                                                 <><RotateCcw className="w-4 h-4" /> إعادة الطلب</>
+                                            )}
+                                        </button>
+                                    )}
+                                    {order.orderStatus === 'pending' && (
+                                        <button
+                                            onClick={() => handleCancel(order._id)}
+                                            disabled={cancelling === order._id}
+                                            className="flex-1 py-2 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm font-bold hover:bg-red-100 dark:hover:bg-red-900/40 transition flex items-center justify-center gap-1 disabled:opacity-60"
+                                        >
+                                            {cancelling === order._id ? (
+                                                <span className="w-4 h-4 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin" />
+                                            ) : (
+                                                <><XCircle className="w-4 h-4" /> إلغاء الطلب</>
                                             )}
                                         </button>
                                     )}

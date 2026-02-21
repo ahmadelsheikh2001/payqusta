@@ -44,6 +44,8 @@ import PortalOrdersAdminPage from './pages/PortalOrdersAdminPage';
 import ReturnsManagementPage from './pages/ReturnsManagementPage';
 import KYCReviewPage from './pages/KYCReviewPage';
 import SupportMessagesPage from './pages/SupportMessagesPage';
+import ReviewsPage from './pages/ReviewsPage';
+import CouponsPage from './pages/CouponsPage';
 
 // Storefront Pages
 import StorefrontLayout from './storefront/StorefrontLayout';
@@ -68,9 +70,11 @@ import PortalInstallmentCalculator from './portal/PortalInstallmentCalculator';
 import PortalOrders from './portal/PortalOrders';
 import PortalWishlist from './portal/PortalWishlist';
 import PortalSupport from './portal/PortalSupport';
+import PortalSupportChat from './portal/PortalSupportChat';
 import PortalNotifications from './portal/PortalNotifications';
 import PortalCheckout from './portal/PortalCheckout';
 import PortalPointsHistory from './portal/PortalPointsHistory';
+import PortalReviews from './portal/PortalReviews';
 
 
 // Protected Route wrapper
@@ -109,8 +113,13 @@ function MainLayout() {
     setSidebarOpen(false);
   }, [location.pathname]);
 
-  // Dashboard Component (Original)
-  const DashboardComponent = DashboardPage;
+  // Dashboard Component Selection based on role
+  const getDashboardComponent = () => {
+    if (user?.role === 'admin' || user?.isSuperAdmin) {
+      return <DashboardPage />;
+    }
+    return <BranchDashboardPage />;
+  };
 
   return (
     <div className={`flex h-screen overflow-hidden ${dark ? 'dark' : ''}`}>
@@ -143,7 +152,7 @@ function MainLayout() {
                 <Route path="/admin/audit-logs" element={<AdminRoute><AdminAuditLogsPage /></AdminRoute>} />
 
                 {/* Regular Routes */}
-                <Route path="/" element={<DashboardPage />} />
+                <Route path="/" element={getDashboardComponent()} />
                 <Route path="/quick-sale" element={<QuickSalePage />} />
                 <Route path="/command-center" element={<CommandCenterPage />} />
                 <Route path="/products" element={<ProductsPage />} />
@@ -176,6 +185,8 @@ function MainLayout() {
                 <Route path="/returns-management" element={<ReturnsManagementPage />} />
                 <Route path="/kyc-review" element={<KYCReviewPage />} />
                 <Route path="/support-messages" element={<SupportMessagesPage />} />
+                <Route path="/reviews" element={<ReviewsPage />} />
+                <Route path="/coupons" element={<CouponsPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </ErrorBoundary>
@@ -245,8 +256,10 @@ export default function App() {
             <Route path="orders" element={<PortalOrders />} />
             <Route path="wishlist" element={<PortalWishlist />} />
             <Route path="support" element={<PortalSupport />} />
+            <Route path="support/:id" element={<PortalSupportChat />} />
             <Route path="notifications" element={<PortalNotifications />} />
             <Route path="points" element={<PortalPointsHistory />} />
+            <Route path="reviews" element={<PortalReviews />} />
             <Route path="products" element={<ProductCatalog />} />
             <Route path="products/:id" element={<ProductDetails />} />
             <Route path="cart" element={<ShoppingCart />} />

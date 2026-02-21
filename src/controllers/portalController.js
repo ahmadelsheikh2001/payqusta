@@ -928,7 +928,7 @@ class PortalController {
    * POST /api/v1/portal/cart/checkout
    */
   checkout = catchAsync(async (req, res, next) => {
-    const { items, shippingAddress, notes } = req.body;
+    const { items, shippingAddress, notes, signature } = req.body;
     const customer = await Customer.findById(req.user.id).populate('tenant', 'settings');
 
     if (customer.salesBlocked) {
@@ -1026,6 +1026,7 @@ class PortalController {
         notes: shippingAddress.notes || '',
       },
       notes: notes || 'طلب من خلال بوابة العملاء',
+      electronicSignature: signature || null,
       orderStatusHistory: [{ status: 'pending', note: 'تم استلام الطلب من البوابة الإلكترونية' }],
     });
 
@@ -1072,6 +1073,7 @@ class PortalController {
         message: `طلبك رقم #${invoice.invoiceNumber} بقيمة ${totalAmount.toLocaleString()} ج.م قيد المراجعة`,
         icon: 'shopping-bag',
         color: 'success',
+        link: `/portal/orders/${invoice._id}`
       });
     } catch (e) { /* ignore */ }
 
@@ -1375,6 +1377,7 @@ class PortalController {
       message: `تم إرسال رسالتك "${subject}" للمتجر. سيتم التواصل معك قريباً.`,
       icon: 'check-circle',
       color: 'success',
+      link: `/portal/support/${supportMsg._id}`
     });
 
     ApiResponse.success(res, {
@@ -1384,6 +1387,91 @@ class PortalController {
         email: customer.tenant?.businessInfo?.email,
       }
     }, 'تم إرسال رسالتك بنجاح. سيتم التواصل معك قريباً');
+  });
+
+  /**
+   * GET /api/v1/portal/support
+   * Fetch all support messages for the logged in customer
+   */
+  getSupportMessages = catchAsync(async (req, res, next) => {
+    const SupportMessage = require('../models/SupportMessage');
+    const messages = await SupportMessage.find({ customer: req.user.id })
+      .sort('-createdAt')
+      .lean();
+
+    ApiResponse.success(res, messages);
+  });
+
+  /**
+   * GET /api/v1/portal/support/:id
+   * Fetch a specific support message thread
+   */
+  getSupportMessageById = catchAsync(async (req, res, next) => {
+    const SupportMessage = require('../models/SupportMessage');
+    const message = await SupportMessage.findOne({
+      _id: req.params.id,
+      customer: req.user.id,
+    }).lean();
+
+    if (!message) return next(AppError.notFound('التذكرة غير موجودة'));
+
+    ApiResponse.success(res, message);
+  });
+
+  /**
+   * POST /api/v1/portal/support/:id/reply
+   * Reply to an existing support message thread
+   */
+  replyToSupportMessage = catchAsync(async (req, res, next) => {
+    const { message } = req.body;
+    if (!message) return next(AppError.badRequest('الرسالة مطلوبة'));
+
+    const SupportMessage = require('../models/SupportMessage');
+    const Notification = require('../models/Notification');
+    const User = require('../models/User');
+    const customer = await Customer.findById(req.user.id);
+
+    const supportMsg = await SupportMessage.findOne({
+      _id: req.params.id,
+      customer: req.user.id,
+    });
+
+    if (!supportMsg) return next(AppError.notFound('التذكرة غير موجودة'));
+    if (supportMsg.status === 'closed') return next(AppError.badRequest('هذه التذكرة مغلقة ولا يمكن الرد عليها'));
+
+    supportMsg.replies.push({
+      message,
+      sender: 'customer',
+      senderName: customer.name,
+    });
+
+    if (supportMsg.status === 'replied') {
+      supportMsg.status = 'open'; // Re-open if it was replied by vendor and now customer replies
+    }
+
+    await supportMsg.save();
+
+    // Notify admins about customer reply
+    const admins = await User.find({
+      tenant: customer.tenant,
+      role: { $in: ['admin', 'vendor', 'coordinator'] }
+    }).select('_id');
+
+    for (const admin of admins) {
+      await Notification.create({
+        tenant: customer.tenant,
+        recipient: admin._id,
+        type: 'system',
+        title: `رد جديد من العميل ${customer.name}`,
+        message: `رد على التذكرة: ${supportMsg.subject.substring(0, 50)}...`,
+        icon: 'message-square',
+        color: 'info',
+        link: `/support-messages`,
+        relatedId: supportMsg._id,
+      });
+    }
+
+    ApiResponse.success(res, supportMsg, 'تم إرسال ردك بنجاح');
   });
 
   // ═══════════════════════════════════════════
@@ -1555,6 +1643,150 @@ class PortalController {
       remaining: invoice.total - invoice.paid,
       status: invoice.status
     }, 'تم الدفع بنجاح');
+  });
+
+  // ──────────────────────────────────────────
+  // Reviews & Ratings
+  // ──────────────────────────────────────────
+
+  /**
+   * POST /portal/reviews
+   * Customer submits a review
+   */
+  submitReview = catchAsync(async (req, res, next) => {
+    const Review = require('../models/Review');
+    const { productId, invoiceId, type = 'store', rating, title, body } = req.body;
+    const customer = req.portalCustomer;
+
+    if (!rating || rating < 1 || rating > 5) {
+      return next(AppError.badRequest('التقييم يجب أن يكون بين 1 و 5'));
+    }
+
+    // Check if product review already exists for this customer
+    if (productId) {
+      const existing = await Review.findOne({ tenant: customer.tenant, customer: customer._id, product: productId });
+      if (existing) return next(AppError.badRequest('لقد قيّمت هذا المنتج من قبل'));
+    }
+
+    // Verify purchase if product review
+    let isVerifiedPurchase = false;
+    if (productId && invoiceId) {
+      const Invoice = require('../models/Invoice');
+      const invoice = await Invoice.findOne({
+        _id: invoiceId,
+        customer: customer._id,
+        'items.product': productId,
+      });
+      isVerifiedPurchase = !!invoice;
+    }
+
+    const review = await Review.create({
+      tenant: customer.tenant,
+      customer: customer._id,
+      product: productId || null,
+      invoice: invoiceId || null,
+      type,
+      rating: parseInt(rating),
+      title: title?.trim(),
+      body: body?.trim(),
+      isVerifiedPurchase,
+      status: 'pending',
+    });
+
+    ApiResponse.success(res, { review }, 'تم إرسال تقييمك بنجاح وسيتم مراجعته قريباً');
+  });
+
+  /**
+   * GET /portal/reviews
+   * Customer gets their own reviews
+   */
+  getMyReviews = catchAsync(async (req, res) => {
+    const Review = require('../models/Review');
+    const customer = req.portalCustomer;
+
+    const reviews = await Review.find({ tenant: customer.tenant, customer: customer._id })
+      .populate('product', 'name images')
+      .sort({ createdAt: -1 });
+
+    ApiResponse.success(res, { reviews });
+  });
+
+  // ──────────────────────────────────────────
+  // Coupon Validation (Portal)
+  // ──────────────────────────────────────────
+
+  /**
+   * POST /portal/coupons/validate
+   * Customer validates a coupon code before checkout
+   */
+  validateCoupon = catchAsync(async (req, res, next) => {
+    const Coupon = require('../models/Coupon');
+    const { code, orderTotal } = req.body;
+    const customer = req.portalCustomer;
+
+    if (!code) return next(AppError.badRequest('يرجى إدخال كود الخصم'));
+    if (!orderTotal || orderTotal <= 0) return next(AppError.badRequest('المبلغ غير صالح'));
+
+    const coupon = await Coupon.findOne({ tenant: customer.tenant, code: code.toUpperCase().trim() });
+    if (!coupon) return next(AppError.notFound('كود الخصم غير صالح'));
+
+    const validity = coupon.isValid();
+    if (!validity.valid) return next(AppError.badRequest(validity.reason));
+
+    if (orderTotal < coupon.minOrderAmount) {
+      return next(AppError.badRequest(`الحد الأدنى للطلب لاستخدام هذا الكوبون هو ${coupon.minOrderAmount} ج.م`));
+    }
+
+    if (coupon.applicableCustomers.length > 0) {
+      if (!coupon.applicableCustomers.some(id => id.toString() === customer._id.toString())) {
+        return next(AppError.badRequest('هذا الكوبون غير مخصص لك'));
+      }
+    }
+
+    const customerUsages = coupon.usages.filter(u => u.customer?.toString() === customer._id.toString()).length;
+    if (customerUsages >= (coupon.usagePerCustomer || 1)) {
+      return next(AppError.badRequest('لقد استخدمت هذا الكوبون بالحد الأقصى المسموح'));
+    }
+
+    const discountAmount = coupon.calculateDiscount(orderTotal);
+    ApiResponse.success(res, {
+      coupon: { _id: coupon._id, code: coupon.code, description: coupon.description, type: coupon.type, value: coupon.value },
+      discountAmount: parseFloat(discountAmount.toFixed(2)),
+      finalTotal: parseFloat((orderTotal - discountAmount).toFixed(2)),
+    }, `وفرت ${discountAmount.toFixed(2)} ج.م!`);
+  });
+
+  /**
+   * GET /portal/reviews/store
+   * Get approved store reviews (public for portal home)
+   */
+  getStoreReviews = catchAsync(async (req, res) => {
+    const Review = require('../models/Review');
+    const customer = req.portalCustomer;
+    const { page = 1, limit = 10 } = req.query;
+
+    const filter = { tenant: customer.tenant, type: 'store', status: 'approved' };
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [reviews, total, avgResult] = await Promise.all([
+      Review.find(filter)
+        .populate('customer', 'name avatar')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit)),
+      Review.countDocuments(filter),
+      Review.aggregate([
+        { $match: filter },
+        { $group: { _id: null, avg: { $avg: '$rating' }, count: { $sum: 1 } } },
+      ]),
+    ]);
+
+    ApiResponse.success(res, {
+      reviews,
+      avgRating: avgResult[0]?.avg ? parseFloat(avgResult[0].avg.toFixed(1)) : 0,
+      total,
+      pages: Math.ceil(total / parseInt(limit)),
+    });
   });
 }
 

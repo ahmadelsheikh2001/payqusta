@@ -188,14 +188,9 @@ class PayQustaServer {
     // Compression
     this.app.use(compression());
 
-    // Logging
-    if (process.env.NODE_ENV === 'development') {
-      this.app.use(morgan('dev'));
-    } else {
-      this.app.use(morgan('combined', {
-        stream: { write: (msg) => logger.info(msg.trim()) },
-      }));
-    }
+    // Logging — Morgan writes HTTP requests to Winston (dev + prod)
+    const morganFormat = process.env.NODE_ENV === 'development' ? 'dev' : 'combined';
+    this.app.use(morgan(morganFormat, { stream: logger.morganStream }));
 
     // Static files
     this.app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

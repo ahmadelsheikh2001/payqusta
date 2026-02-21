@@ -122,31 +122,28 @@ export default function PortalPointsHistory() {
           </div>
           <button
             onClick={() => setFilter('all')}
-            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
-              filter === 'all'
+            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${filter === 'all'
                 ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/30'
                 : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
-            }`}
+              }`}
           >
             الكل
           </button>
           <button
             onClick={() => setFilter('earned')}
-            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
-              filter === 'earned'
+            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${filter === 'earned'
                 ? 'bg-green-600 text-white shadow-lg shadow-green-500/30'
                 : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
-            }`}
+              }`}
           >
             مكتسبة
           </button>
           <button
             onClick={() => setFilter('redeemed')}
-            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
-              filter === 'redeemed'
+            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${filter === 'redeemed'
                 ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/30'
                 : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
-            }`}
+              }`}
           >
             مستبدلة
           </button>
@@ -168,11 +165,10 @@ export default function PortalPointsHistory() {
                 >
                   <div className="flex items-center gap-4">
                     {/* Icon */}
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
-                      item.type === 'earn'
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${item.type === 'earn'
                         ? 'bg-green-50 dark:bg-green-900/20'
                         : 'bg-purple-50 dark:bg-purple-900/20'
-                    }`}>
+                      }`}>
                       {getIcon(item.type)}
                     </div>
 
@@ -189,24 +185,24 @@ export default function PortalPointsHistory() {
                             </p>
                           )}
                         </div>
-                        <div className={`text-xl font-black shrink-0 ${
-                          item.type === 'earn'
+                        <div className={`text-xl font-black shrink-0 ${item.type === 'earn'
                             ? 'text-green-600 dark:text-green-400'
                             : 'text-purple-600 dark:text-purple-400'
-                        }`}>
+                          }`}>
                           {item.type === 'earn' ? '+' : '-'}{item.points}
                         </div>
                       </div>
                       <div className="flex items-center gap-3 text-xs text-gray-400">
                         <div className="flex items-center gap-1">
                           <Calendar className="w-3 h-3" />
-                          {format(new Date(item.createdAt), 'dd MMM yyyy, hh:mm a', { locale: ar })}
+                          {item.createdAt && !isNaN(new Date(item.createdAt).valueOf())
+                            ? format(new Date(item.createdAt), 'dd MMM yyyy, hh:mm a', { locale: ar })
+                            : 'غير متوفر'}
                         </div>
-                        <span className={`px-2 py-0.5 rounded-full ${
-                          item.type === 'earn'
+                        <span className={`px-2 py-0.5 rounded-full ${item.type === 'earn'
                             ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
                             : 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400'
-                        }`}>
+                          }`}>
                           {getTypeLabel(item.type)}
                         </span>
                       </div>
@@ -227,8 +223,8 @@ export default function PortalPointsHistory() {
                 {filter === 'all'
                   ? 'لم تقم بأي نشاط يتعلق بالنقاط حتى الآن'
                   : filter === 'earned'
-                  ? 'لم تكسب أي نقاط حتى الآن'
-                  : 'لم تستبدل أي نقاط حتى الآن'}
+                    ? 'لم تكسب أي نقاط حتى الآن'
+                    : 'لم تستبدل أي نقاط حتى الآن'}
               </p>
             </div>
           )}

@@ -2,6 +2,7 @@
  * Invoice Service — Business Logic for Sales & Invoices
  */
 
+const mongoose = require('mongoose');
 const Invoice = require('../models/Invoice');
 const Customer = require('../models/Customer');
 const Product = require('../models/Product');
@@ -26,12 +27,17 @@ class InvoiceService {
       notes, sendWhatsApp, source
     } = data;
 
+    // Start MongoDB session for atomic transaction
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
     // Validate customer
     const customer = await Customer.findOne({
       _id: customerId,
       tenant: tenantId,
       isActive: true
-    });
+    }).session(session);
     if (!customer) throw AppError.notFound('العميل غير موجود');
 
     // Check if sales blocked for this customer
@@ -39,16 +45,17 @@ class InvoiceService {
       throw AppError.badRequest(`⛔ البيع ممنوع لهذا العميل: ${customer.salesBlockedReason || 'تم منع البيع'}`);
     }
 
-    // Validate and prepare items
+    // Validate and prepare items (read stock without modifying yet)
     const invoiceItems = [];
     let subtotal = 0;
+    const productsToUpdate = []; // collect products, update stock after invoice is created
 
     for (const item of items) {
       const product = await Product.findOne({
         _id: item.productId,
         tenant: tenantId,
         isActive: true
-      });
+      }).session(session);
 
       if (!product) {
         throw AppError.notFound(`المنتج غير موجود: ${item.productId}`);
@@ -70,9 +77,7 @@ class InvoiceService {
         totalPrice,
       });
 
-      // Deduct stock
-      product.stock.quantity -= item.quantity;
-      await product.save();
+      productsToUpdate.push({ product, quantity: item.quantity });
 
       // Trigger low stock / out of stock notifications
       if (product.stock.quantity <= 0 && !product.outOfStockAlertSent) {
@@ -148,24 +153,41 @@ class InvoiceService {
       invoiceData.dueDate = data.dueDate ? new Date(data.dueDate) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     }
 
-    // Create Invoice
-    const invoice = await Invoice.create(invoiceData);
+    // Create Invoice FIRST (inside transaction)
+    const [invoice] = await Invoice.create([invoiceData], { session });
 
-    // Update customer financials
+    // NOW deduct stock (after invoice is created successfully)
+    for (const { product, quantity } of productsToUpdate) {
+      product.stock.quantity -= quantity;
+      await product.save({ session });
+
+      // Trigger low stock / out of stock notifications (non-blocking, outside transaction)
+      if (product.stock.quantity <= 0 && !product.outOfStockAlertSent) {
+        NotificationService.onOutOfStock(tenantId, product).catch(() => {});
+      } else if (product.stock.quantity <= product.stock.minQuantity && !product.lowStockAlertSent) {
+        NotificationService.onLowStock(tenantId, product).catch(() => {});
+      }
+    }
+
+    // Update customer financials (inside transaction)
     customer.recordPurchase(totalAmount, invoiceData.paidAmount);
-    await customer.save();
+    await customer.save({ session });
 
-    // Gamification
+    // Commit transaction - all operations succeeded
+    await session.commitTransaction();
+    session.endSession();
+
+    // Post-transaction: Gamification (non-critical)
     if (userId) {
       const xpEarned = Math.floor(totalAmount / 10);
       if (xpEarned > 0) {
-        await GamificationService.addXP(userId, xpEarned);
+        GamificationService.addXP(userId, xpEarned).catch(() => {});
       }
-      await GamificationService.checkAchievements(userId, totalAmount);
+      GamificationService.checkAchievements(userId, totalAmount).catch(() => {});
     }
 
-    // Notifications
-    const Tenant = require('../models/Tenant'); // Lazy load
+    // Post-transaction: Notifications (non-critical)
+    const Tenant = require('../models/Tenant');
     const tenant = await Tenant.findById(tenantId);
 
     if (sendWhatsApp && customer.whatsapp?.enabled && customer.whatsapp?.notifications?.invoices !== false) {
@@ -178,7 +200,7 @@ class InvoiceService {
         invoice.whatsappSent = true;
         invoice.whatsappSentAt = new Date();
         invoice.save();
-      }).catch(() => {}); // Don't block
+      }).catch(() => {});
     }
 
     NotificationService.onInvoiceCreated(tenantId, invoice, customer.name).catch(() => {});
@@ -189,6 +211,13 @@ class InvoiceService {
       .populate('createdBy', 'name');
 
     return populatedInvoice;
+
+    } catch (err) {
+      // Rollback all changes if anything failed
+      await session.abortTransaction();
+      session.endSession();
+      throw err;
+    }
   }
 }
 

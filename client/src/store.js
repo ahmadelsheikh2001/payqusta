@@ -107,6 +107,18 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
+  logoutAll: async () => {
+    try {
+      await api.post('/auth/logout-all');
+    } catch (error) {
+      console.error('Logout all API failed:', error);
+    } finally {
+      localStorage.removeItem('payqusta_token');
+      set({ user: null, tenant: null, token: null, isAuthenticated: false });
+      window.location.href = '/login';
+    }
+  },
+
   // --- Multi-Branch Actions ---
   switchTenant: async (tenantId) => {
     set({ loading: true });
@@ -131,7 +143,8 @@ export const useAuthStore = create((set, get) => ({
 
   getBranches: async () => {
     try {
-      const { data } = await api.get('/tenants/my-branches');
+      // Unified endpoint: use /branches (branchController) instead of /tenants/my-branches
+      const { data } = await api.get('/branches');
       return data.data;
     } catch (error) {
       return [];
@@ -141,7 +154,8 @@ export const useAuthStore = create((set, get) => ({
   createBranch: async (data) => {
     set({ loading: true });
     try {
-      const res = await api.post('/tenants/branch', data);
+      // Unified endpoint: use /branches (branchController) instead of /tenants/branch
+      const res = await api.post('/branches', data);
       set({ loading: false });
       return res.data;
     } catch (error) {
@@ -358,4 +372,26 @@ export const profileApi = {
   updateProfile: (data) => api.put('/auth/update-profile', data),
   updateAvatar: (formData) => api.put('/auth/update-avatar', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
   removeAvatar: () => api.delete('/auth/remove-avatar'),
+};
+
+// Coupons API
+export const couponsApi = {
+  getAll: (params) => api.get('/coupons', { params }),
+  getStats: () => api.get('/coupons/stats'),
+  getById: (id) => api.get(`/coupons/${id}`),
+  create: (data) => api.post('/coupons', data),
+  update: (id, data) => api.put(`/coupons/${id}`, data),
+  delete: (id) => api.delete(`/coupons/${id}`),
+  validate: (data) => api.post('/coupons/validate', data),
+};
+
+// Reviews API
+export const reviewsApi = {
+  getAll: (params) => api.get('/reviews', { params }),
+  getStats: () => api.get('/reviews/stats'),
+  getById: (id) => api.get(`/reviews/${id}`),
+  updateStatus: (id, status) => api.patch(`/reviews/${id}/status`, { status }),
+  addReply: (id, body) => api.post(`/reviews/${id}/reply`, { body }),
+  delete: (id) => api.delete(`/reviews/${id}`),
+  getProductReviews: (productId, params) => api.get(`/reviews/product/${productId}`, { params }),
 };

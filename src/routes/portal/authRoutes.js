@@ -68,6 +68,17 @@ router.get('/wishlist', portalController.getWishlist);
 router.post('/wishlist/:productId', portalController.toggleWishlist);
 
 // Support
+router.get('/support', portalController.getSupportMessages);
+router.get('/support/:id', portalController.getSupportMessageById);
 router.post('/support', portalController.sendSupportMessage);
+router.post('/support/:id/reply', portalController.replyToSupportMessage);
+
+// Reviews
+router.get('/reviews', portalController.getMyReviews);
+router.get('/reviews/store', portalController.getStoreReviews);
+router.post('/reviews', portalController.submitReview);
+
+// Coupons (validate from portal during checkout)
+router.post('/coupons/validate', portalController.validateCoupon);
 
 module.exports = router;

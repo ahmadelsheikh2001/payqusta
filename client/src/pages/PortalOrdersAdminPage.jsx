@@ -321,6 +321,19 @@ export default function PortalOrdersAdminPage() {
                             </div>
                         )}
 
+                        {/* Electronic Signature */}
+                        {selected.electronicSignature && (
+                            <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-4 text-sm text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800">
+                                <h4 className="font-bold mb-1 flex items-center gap-2">التوقيع الإلكتروني الإلزامي (للشراء الآجل)</h4>
+                                <p className="text-emerald-600 dark:text-emerald-500 text-xs mb-2">
+                                    أقر العميل بصحة البيانات وبالموافقة على شروط الدفع الآجل بالتفويض التالي:
+                                </p>
+                                <p className="font-medium text-emerald-900 dark:text-emerald-100 font-mono text-base bg-white/60 dark:bg-black/20 px-4 py-2 rounded-lg text-center shadow-inner">
+                                    {selected.electronicSignature}
+                                </p>
+                            </div>
+                        )}
+
                         {/* Status History */}
                         {selected.orderStatusHistory?.length > 0 && (
                             <div>

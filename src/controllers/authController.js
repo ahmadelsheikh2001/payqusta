@@ -332,7 +332,7 @@ class AuthController {
       name,
       email,
       phone,
-      password: password || '123456', // Default password if not provided
+      password,
       role,
       tenant: req.tenantId,
     });
@@ -411,6 +411,26 @@ class AuthController {
     await user.save({ validateBeforeSave: false });
 
     ApiResponse.success(res, null, 'تم تعطيل المستخدم');
+  });
+
+  /**
+   * POST /api/v1/auth/logout-all
+   * Logout from all devices by incrementing sessionVersion
+   */
+  logoutAll = catchAsync(async (req, res) => {
+    await User.findByIdAndUpdate(req.user._id, { $inc: { sessionVersion: 1 } });
+
+    await AuditLog.log({
+      tenant: req.user.tenant,
+      user: req.user._id,
+      action: 'logout_all',
+      resource: 'auth',
+      details: { ip: req.ip },
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+    });
+
+    ApiResponse.success(res, null, 'تم تسجيل الخروج من جميع الأجهزة بنجاح');
   });
 
   /**

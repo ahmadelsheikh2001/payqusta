@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { usePortalStore } from '../store/portalStore';
 import { useThemeStore } from '../store';
 import { Bell, CheckCircle, Clock, ShoppingBag, CreditCard, AlertTriangle, MessageCircle, Star, Check, CheckCheck } from 'lucide-react';
@@ -23,6 +24,7 @@ const colorMap = {
 };
 
 export default function PortalNotifications() {
+  const navigate = useNavigate();
   const { fetchNotifications, markNotificationRead, markAllNotificationsRead, unreadCount } = usePortalStore();
   const { dark } = useThemeStore();
   const [notifications, setNotifications] = useState([]);
@@ -46,6 +48,15 @@ export default function PortalNotifications() {
   const handleMarkRead = async (id) => {
     await markNotificationRead(id);
     setNotifications(prev => prev.map(n => n._id === id ? { ...n, isRead: true } : n));
+  };
+
+  const handleNotificationClick = async (notif) => {
+    if (!notif.isRead) {
+      handleMarkRead(notif._id);
+    }
+    if (notif.link) {
+      navigate(notif.link);
+    }
   };
 
   const handleMarkAllRead = async () => {
@@ -109,12 +120,11 @@ export default function PortalNotifications() {
             return (
               <div
                 key={notif._id}
-                onClick={() => !notif.isRead && handleMarkRead(notif._id)}
-                className={`bg-white dark:bg-gray-800/80 rounded-2xl p-4 border transition-all cursor-pointer ${
-                  notif.isRead
+                onClick={() => handleNotificationClick(notif)}
+                className={`bg-white dark:bg-gray-800/80 rounded-2xl p-4 border transition-all cursor-pointer ${notif.isRead
                     ? 'border-gray-100 dark:border-gray-700 opacity-70'
                     : 'border-primary-200 dark:border-primary-800 shadow-sm shadow-primary-500/5'
-                }`}
+                  }`}
               >
                 <div className="flex gap-3">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${colorClass}`}>
@@ -145,11 +155,10 @@ export default function PortalNotifications() {
             <button
               key={i}
               onClick={() => loadNotifications(i + 1)}
-              className={`w-8 h-8 rounded-lg text-sm font-bold ${
-                pagination.page === i + 1
+              className={`w-8 h-8 rounded-lg text-sm font-bold ${pagination.page === i + 1
                   ? 'bg-primary-500 text-white'
                   : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700'
-              }`}
+                }`}
             >
               {i + 1}
             </button>

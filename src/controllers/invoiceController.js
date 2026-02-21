@@ -44,10 +44,22 @@ class InvoiceController {
       if (endDate) filter.createdAt.$lte = new Date(endDate);
     }
 
-    // Search by invoice number or customer name
+    // Search by invoice number or customer name/phone
     if (search) {
+      // Find matching customers first
+      const matchingCustomers = await Customer.find({
+        ...req.tenantFilter,
+        $or: [
+          { name: { $regex: search, $options: 'i' } },
+          { phone: { $regex: search, $options: 'i' } }
+        ]
+      }).select('_id').lean();
+
+      const customerIds = matchingCustomers.map(c => c._id);
+
       filter.$or = [
         { invoiceNumber: { $regex: search, $options: 'i' } },
+        ...(customerIds.length > 0 ? [{ customer: { $in: customerIds } }] : [])
       ];
     }
 
@@ -174,13 +186,16 @@ class InvoiceController {
       return next(AppError.badRequest('الفاتورة مدفوعة بالكامل'));
     }
 
+    // Capture remaining amount BEFORE calling payAllRemaining (it sets it to 0)
+    const amountBeingPaid = invoice.remainingAmount;
+
     invoice.payAllRemaining(req.user._id);
     await invoice.save();
 
-    // Update customer
+    // Update customer with the correct amount that was paid
     const customer = await Customer.findById(invoice.customer);
-    if (customer) {
-      customer.recordPayment(invoice.remainingAmount, true);
+    if (customer && amountBeingPaid > 0) {
+      customer.recordPayment(amountBeingPaid, true);
       await customer.save();
     }
 

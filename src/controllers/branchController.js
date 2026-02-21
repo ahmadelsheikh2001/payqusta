@@ -228,8 +228,9 @@ class BranchController {
         createdAt: { $gte: todayStart, $lt: todayEnd }
       });
 
-      const todaySales = todayInvoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
-      const todayPaid = todayInvoices.reduce((sum, inv) => sum + (inv.paid || 0), 0);
+      // Use correct Invoice schema field names: totalAmount and paidAmount
+      const todaySales = todayInvoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+      const todayPaid = todayInvoices.reduce((sum, inv) => sum + (inv.paidAmount || 0), 0);
       const todayCount = todayInvoices.length;
 
       // Today's expenses
@@ -255,13 +256,15 @@ class BranchController {
           date: { $gte: branch.currentShift.startTime }
         });
 
+        const shiftSales = shiftInvoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+        const shiftExpensesTotal = shiftExpenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
         currentShift = {
           ...branch.currentShift.toObject(),
-          sales: shiftInvoices.reduce((sum, inv) => sum + (inv.total || 0), 0),
-          paid: shiftInvoices.reduce((sum, inv) => sum + (inv.paid || 0), 0),
+          sales: shiftSales,
+          paid: shiftInvoices.reduce((sum, inv) => sum + (inv.paidAmount || 0), 0),
           invoicesCount: shiftInvoices.length,
-          expenses: shiftExpenses.reduce((sum, exp) => sum + (exp.amount || 0), 0),
-          profit: shiftInvoices.reduce((sum, inv) => sum + (inv.total || 0), 0) - shiftExpenses.reduce((sum, exp) => sum + (exp.amount || 0), 0)
+          expenses: shiftExpensesTotal,
+          profit: shiftSales - shiftExpensesTotal
         };
       }
 
@@ -417,10 +420,11 @@ class BranchController {
         date: { $gte: startOfDay, $lt: endOfDay }
       });
 
-      const totalSales = invoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
-      const cashSales = invoices.filter(inv => inv.paymentMethod === 'cash').reduce((sum, inv) => sum + (inv.paid || 0), 0);
-      const cardSales = invoices.filter(inv => inv.paymentMethod === 'card').reduce((sum, inv) => sum + (inv.paid || 0), 0);
-      const creditSales = invoices.filter(inv => inv.paymentMethod === 'credit' || inv.paymentMethod === 'installments').reduce((sum, inv) => sum + (inv.total || 0), 0);
+      // Use correct Invoice schema field names: totalAmount and paidAmount
+      const totalSales = invoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+      const cashSales = invoices.filter(inv => inv.paymentMethod === 'cash').reduce((sum, inv) => sum + (inv.paidAmount || 0), 0);
+      const cardSales = invoices.filter(inv => inv.paymentMethod === 'card').reduce((sum, inv) => sum + (inv.paidAmount || 0), 0);
+      const creditSales = invoices.filter(inv => inv.paymentMethod === 'credit' || inv.paymentMethod === 'installments').reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
       const totalExpenses = expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
       const netCash = cashSales - totalExpenses;
 

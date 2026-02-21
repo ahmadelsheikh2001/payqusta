@@ -202,7 +202,12 @@ export default function SupportMessagesPage() {
                   </div>
                 </div>
 
-                <ChevronLeft className="w-5 h-5 text-gray-300 group-hover:text-primary-500 transition-colors mt-3 flex-shrink-0" />
+                <div className="flex flex-col items-end gap-2 mt-2">
+                  <span className="text-xs text-primary-600 bg-primary-50 dark:bg-primary-900/10 px-2 py-1 rounded-lg font-bold">
+                    عرض التفاصيل
+                  </span>
+                  <ChevronLeft className="w-5 h-5 text-gray-300 group-hover:text-primary-500 transition-colors flex-shrink-0" />
+                </div>
               </div>
             </Card>
           ))}

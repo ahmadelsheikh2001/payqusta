@@ -44,6 +44,11 @@ const protect = async (req, res, next) => {
       return next(AppError.unauthorized('تم تغيير كلمة المرور. يرجى تسجيل الدخول مرة أخرى'));
     }
 
+    // Check session version (logout from all devices)
+    if (decoded.sv !== undefined && decoded.sv !== (user.sessionVersion || 0)) {
+      return next(AppError.unauthorized('تم إنهاء جلستك. يرجى تسجيل الدخول مرة أخرى'));
+    }
+
     // Attach user and tenant to request
     req.user = user;
     req.tenantId = decoded.tenant || user.tenant;
@@ -111,17 +116,20 @@ const publicTenantScope = async (req, res, next) => {
       return next();
     }
 
-    // Try to get tenant from header or query or slug
+    // Try to get tenant from header, query or slug
     const tenantId = req.headers['x-tenant-id'] || req.query.tenant;
-    
+    const slug = req.query.slug || req.headers['x-tenant-slug'];
+
+    if (!tenantId && !slug) {
+      return next(AppError.badRequest('يرجى تحديد المتجر (x-tenant-id أو slug)'));
+    }
+
+    const Tenant = require('../models/Tenant');
     let tenant;
     if (tenantId) {
-      const Tenant = require('../models/Tenant');
       tenant = await Tenant.findById(tenantId);
     } else {
-      // For now, default to the first tenant if none specified
-      const Tenant = require('../models/Tenant');
-      tenant = await Tenant.findOne();
+      tenant = await Tenant.findOne({ slug });
     }
 
     if (!tenant) {

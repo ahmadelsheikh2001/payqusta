@@ -34,6 +34,7 @@ router.post('/auth/login', authController.login);
 router.post('/auth/forgot-password', authController.forgotPassword);
 router.post('/auth/reset-password/:token', authController.resetPassword);
 router.post('/auth/logout', protect, authController.logout);
+router.post('/auth/logout-all', protect, authController.logoutAll);
 
 // ============ PUBLIC STOREFRONT ROUTES ============
 // Note: Product/Customer public routes are now handled dynamically or need to be potentially routed via the modules if they support public access.
@@ -163,14 +164,14 @@ router.delete('/settings/categories/:name', authorize('vendor', 'admin'), settin
 
 // --- Owner Management (Returns, KYC, Support) ---
 const ownerMgmt = require('../controllers/ownerManagementController');
-router.get('/manage/returns', authorize('vendor', 'admin'), ownerMgmt.getReturns);
-router.patch('/manage/returns/:id', authorize('vendor', 'admin'), ownerMgmt.updateReturn);
-router.get('/manage/documents', authorize('vendor', 'admin'), ownerMgmt.getDocuments);
-router.patch('/manage/documents/:customerId/:docId', authorize('vendor', 'admin'), ownerMgmt.reviewDocument);
-router.get('/manage/support', authorize('vendor', 'admin'), ownerMgmt.getSupportMessages);
-router.get('/manage/support/:id', authorize('vendor', 'admin'), ownerMgmt.getSupportMessage);
-router.post('/manage/support/:id/reply', authorize('vendor', 'admin'), ownerMgmt.replySupportMessage);
-router.patch('/manage/support/:id/close', authorize('vendor', 'admin'), ownerMgmt.closeSupportMessage);
+router.get('/manage/returns', authorize('vendor', 'admin', 'coordinator'), ownerMgmt.getReturns);
+router.patch('/manage/returns/:id', authorize('vendor', 'admin', 'coordinator'), ownerMgmt.updateReturn);
+router.get('/manage/documents', authorize('vendor', 'admin', 'coordinator'), ownerMgmt.getDocuments);
+router.patch('/manage/documents/:customerId/:docId', authorize('vendor', 'admin', 'coordinator'), ownerMgmt.reviewDocument);
+router.get('/manage/support', authorize('vendor', 'admin', 'coordinator'), ownerMgmt.getSupportMessages);
+router.get('/manage/support/:id', authorize('vendor', 'admin', 'coordinator'), ownerMgmt.getSupportMessage);
+router.post('/manage/support/:id/reply', authorize('vendor', 'admin', 'coordinator'), ownerMgmt.replySupportMessage);
+router.patch('/manage/support/:id/close', authorize('vendor', 'admin', 'coordinator'), ownerMgmt.closeSupportMessage);
 
 // --- Roles & Permissions ---
 const roleController = require('../controllers/roleController');
@@ -251,6 +252,26 @@ router.post('/import/products', authorize('vendor', 'admin'), checkLimit('produc
 router.post('/import/customers', authorize('vendor', 'admin'), importUpload.single('file'), auditLog('import', 'customer'), importController.importCustomers);
 router.post('/import/preview', authorize('vendor', 'admin'), importUpload.single('file'), importController.previewFile);
 router.get('/import/template/:type', authorize('vendor', 'admin'), importController.downloadTemplate);
+
+// ============ REVIEWS ROUTES ============
+const reviewController = require('../controllers/reviewController');
+router.get('/reviews', authorize('vendor', 'admin', 'coordinator'), reviewController.getAll);
+router.get('/reviews/stats', authorize('vendor', 'admin'), reviewController.getStats);
+router.get('/reviews/product/:productId', reviewController.getProductReviews);
+router.get('/reviews/:id', authorize('vendor', 'admin', 'coordinator'), reviewController.getById);
+router.patch('/reviews/:id/status', authorize('vendor', 'admin'), reviewController.updateStatus);
+router.post('/reviews/:id/reply', authorize('vendor', 'admin'), reviewController.addReply);
+router.delete('/reviews/:id', authorize('vendor', 'admin'), reviewController.delete);
+
+// ============ COUPON ROUTES ============
+const couponController = require('../controllers/couponController');
+router.get('/coupons', authorize('vendor', 'admin'), couponController.getAll);
+router.get('/coupons/stats', authorize('vendor', 'admin'), couponController.getStats);
+router.post('/coupons/validate', couponController.validate); // Can be called from POS (vendor) or portal
+router.get('/coupons/:id', authorize('vendor', 'admin'), couponController.getById);
+router.post('/coupons', authorize('vendor', 'admin'), auditLog('create', 'coupon'), couponController.create);
+router.put('/coupons/:id', authorize('vendor', 'admin'), couponController.update);
+router.delete('/coupons/:id', authorize('vendor', 'admin'), auditLog('delete', 'coupon'), couponController.delete);
 
 // ============ BACKUP ROUTES ============
 router.get('/backup/export', authorize('vendor', 'admin'), backupController.exportData);

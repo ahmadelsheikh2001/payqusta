@@ -5,7 +5,7 @@ import { useThemeStore } from '../store';
 import {
   CreditCard, Calendar, ArrowLeft, ShoppingBag, Receipt, FileText,
   User, Star, Search, ShoppingCart, Heart, Bell,
-  ChevronRight, ArrowRight, Tag, Zap, ShieldCheck, Package, MessageCircle
+  ChevronRight, ArrowRight, Tag, Zap, ShieldCheck, Package, MessageCircle, X
 } from 'lucide-react';
 import { LoadingSpinner } from '../components/UI';
 
@@ -13,6 +13,8 @@ export default function PortalHome() {
   const { fetchDashboard, loading, customer, addToCart, toggleWishlist, wishlistIds } = usePortalStore();
   const { dark } = useThemeStore();
   const [data, setData] = useState(null);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -46,15 +48,11 @@ export default function PortalHome() {
       {/* ═══════════════ SEARCH & HERO ═══════════════ */}
       <div className="space-y-4">
         {/* Search Bar */}
-        <div className="relative">
+        <div className="relative cursor-text" onClick={() => setIsSearchOpen(true)}>
           <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            placeholder="عن ماذا تبحث اليوم؟"
-            className="w-full bg-white dark:bg-gray-800 border-none rounded-2xl py-4 pr-12 pl-4 shadow-sm focus:ring-2 focus:ring-primary-500/20 text-sm transition-all"
-            readOnly // For now
-            onClick={() => navigate('/portal/products')}
-          />
+          <div className="w-full bg-white dark:bg-gray-800 border-none rounded-2xl py-4 pr-12 pl-4 shadow-sm text-sm text-gray-400 text-right">
+            عن ماذا تبحث اليوم؟
+          </div>
         </div>
 
         {/* Hero Banner */}
@@ -94,9 +92,10 @@ export default function PortalHome() {
           <h3 className="font-bold text-lg dark:text-white">تصفح الأقسام</h3>
           <Link to="/portal/products" className="text-xs font-bold text-primary-600">عرض الكل</Link>
         </div>
-        <div className="flex gap-4 overflow-x-auto px-2 pb-4 no-scrollbar">
+        {/* Added pr-2 and snap scroll, adjusted width to show half-cards */}
+        <div className="flex gap-4 overflow-x-auto px-2 pb-4 no-scrollbar snap-x snap-mandatory pr-2" style={{ scrollPaddingInlineStart: '0.5rem' }}>
           {categories?.length > 0 ? categories.map((cat, i) => (
-            <Link key={i} to={`/portal/products?category=${cat.slug}`} className="flex flex-col items-center gap-2 group min-w-[80px]">
+            <Link key={i} to={`/portal/products?category=${cat.slug}`} className="flex flex-col items-center gap-2 group min-w-[85px] max-w-[85px] snap-start">
               <div className="w-20 h-20 rounded-2xl bg-white dark:bg-gray-800 p-1 group-hover:bg-primary-50 transition-colors border border-gray-100 dark:border-gray-700 group-hover:border-primary-200 shadow-sm flex items-center justify-center">
                 {/* Since we don't have real category images yet, use a nice icon/placeholder */}
                 <div className="w-full h-full rounded-xl bg-gray-50 dark:bg-gray-700/50 flex items-center justify-center text-primary-500 overflow-hidden">
@@ -104,7 +103,7 @@ export default function PortalHome() {
                   <Tag className="w-8 h-8 opacity-70 group-hover:scale-110 transition-transform" />
                 </div>
               </div>
-              <span className="text-xs font-bold text-gray-700 dark:text-gray-300 group-hover:text-primary-600 text-center line-clamp-1">{cat.name}</span>
+              <span className="text-xs font-bold text-gray-700 dark:text-gray-300 group-hover:text-primary-600 text-center line-clamp-1 w-full px-1">{cat.name}</span>
             </Link>
           )) : (
             <div className="w-full text-center py-4 text-gray-400 text-xs">لا توجد أقسام متاحة</div>
@@ -175,7 +174,7 @@ export default function PortalHome() {
                       e.stopPropagation();
                       addToCart(product);
                     }}
-                    className="absolute bottom-3 right-3 w-10 h-10 bg-white dark:bg-gray-900 rounded-full shadow-lg flex items-center justify-center text-gray-900 dark:text-white hover:bg-primary-600 hover:text-white transition-colors transform translate-y-12 group-hover:translate-y-0 duration-300 z-10"
+                    className="absolute bottom-3 right-3 w-10 h-10 bg-white dark:bg-gray-900 rounded-full shadow-lg flex items-center justify-center text-gray-900 dark:text-white hover:bg-primary-600 hover:text-white transition-all md:translate-y-12 md:group-hover:translate-y-0 duration-300 z-10"
                   >
                     <ShoppingBag className="w-5 h-5" />
                   </button>
@@ -183,9 +182,9 @@ export default function PortalHome() {
                   {/* Wishlist */}
                   <button
                     onClick={(e) => { e.stopPropagation(); toggleWishlist(product._id).catch(() => { }); }}
-                    className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center transition-all hover:scale-110"
+                    className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm flex items-center justify-center transition-all md:opacity-0 md:group-hover:opacity-100 hover:scale-110"
                   >
-                    <Heart className={`w-4 h-4 transition-colors ${wishlistIds?.includes(product._id) ? 'text-red-500 fill-red-500' : 'text-gray-400'}`} />
+                    <Heart className={`w-4 h-4 transition-colors ${wishlistIds?.includes(product._id) ? 'text-red-500 fill-red-500' : 'text-gray-600 dark:text-gray-300'}`} />
                   </button>
                 </div>
 
@@ -216,35 +215,131 @@ export default function PortalHome() {
       {/* ═══════════════ UPCOMING PAYMENTS (Mini) ═══════════════ */}
       {upcomingInstallments?.length > 0 && (
         <div className="px-1">
-          <div className="bg-orange-50 dark:bg-orange-900/10 rounded-3xl p-6 border border-orange-100 dark:border-orange-800/30">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-800/20 flex items-center justify-center text-orange-600">
-                <Calendar className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="font-bold text-gray-900 dark:text-white">تذكير بالدفع</h3>
-                <p className="text-xs text-cool-gray-500">لديك أقساط مستحقة قريباً</p>
-              </div>
-            </div>
+          {(() => {
+            const hasOverdue = upcomingInstallments.some(inst => new Date(inst.dueDate) < new Date());
+            const bgColor = hasOverdue ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800/30' : 'bg-orange-50 dark:bg-orange-900/10 border-orange-100 dark:border-orange-800/30';
+            const iconBg = hasOverdue ? 'bg-red-100 dark:bg-red-800/20 text-red-600' : 'bg-orange-100 dark:bg-orange-800/20 text-orange-600';
 
-            <div className="space-y-3">
-              {upcomingInstallments.slice(0, 2).map((inst, i) => (
-                <div key={i} className="bg-white dark:bg-gray-800 p-3 rounded-2xl flex items-center justify-between shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <span className="font-bold text-lg text-gray-900 dark:text-white">{new Date(inst.dueDate).getDate()}</span>
-                    <div className="flex flex-col">
-                      <span className="text-xs font-bold">قسط مستحق</span>
-                      <span className="text-[10px] text-gray-500">{new Date(inst.dueDate).toLocaleDateString('ar-EG')}</span>
-                    </div>
+            return (
+              <div className={`rounded-3xl p-6 border ${bgColor}`}>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${iconBg}`}>
+                    <Calendar className="w-5 h-5" />
                   </div>
-                  <span className="font-black text-orange-600">{inst.amount.toLocaleString()} {currencyLabel}</span>
+                  <div>
+                    <h3 className={`font-bold ${hasOverdue ? 'text-red-700 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>
+                      {hasOverdue ? 'أقساط متأخرة الدفع!' : 'تذكير بالدفع'}
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      {hasOverdue ? 'يرجى سداد الأقساط المتأخرة لتجنب غرامات التأخير' : 'لديك أقساط مستحقة قريباً'}
+                    </p>
+                  </div>
                 </div>
-              ))}
 
-              <Link to="/portal/invoices" className="block text-center text-xs font-bold text-orange-600 mt-2 hover:underline">
-                عرض كل الأقساط
-              </Link>
+                <div className="space-y-3">
+                  {upcomingInstallments.slice(0, 2).map((inst, i) => (
+                    <div key={i} className="bg-white dark:bg-gray-800 p-3 rounded-2xl flex items-center justify-between shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <span className="font-bold text-lg text-gray-900 dark:text-white">{new Date(inst.dueDate).getDate()}</span>
+                        <div className="flex flex-col">
+                          <span className="text-xs font-bold">قسط مستحق</span>
+                          <span className="text-[10px] text-gray-500">{new Date(inst.dueDate).toLocaleDateString('ar-EG')}</span>
+                        </div>
+                      </div>
+                      <span className="font-black text-orange-600">{inst.amount.toLocaleString()} {currencyLabel}</span>
+                    </div>
+                  ))}
+
+                  <Link to="/portal/invoices" className="block text-center text-xs font-bold text-orange-600 mt-2 hover:underline">
+                    عرض كل الأقساط
+                  </Link>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* ═══════════════ SEARCH MODAL ═══════════════ */}
+      {isSearchOpen && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-gray-50 dark:bg-gray-950 animate-fade-in pb-safe">
+          {/* Header */}
+          <div className="bg-white dark:bg-gray-900 px-4 py-3 shadow-sm flex items-center gap-3">
+            <button
+              onClick={() => setIsSearchOpen(false)}
+              className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-300"
+            >
+              <ArrowRight className="w-5 h-5" />
+            </button>
+            <div className="flex-1 relative">
+              <input
+                autoFocus
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="ابحث عن منتجات، أقسام..."
+                className="w-full bg-gray-100 dark:bg-gray-800 border-none rounded-xl py-2.5 pr-10 pl-4 text-sm focus:ring-2 focus:ring-primary-500/50"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && searchQuery.trim()) {
+                    navigate(`/portal/products?q=${encodeURIComponent(searchQuery)}`);
+                    setIsSearchOpen(false);
+                  }
+                }}
+              />
+              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             </div>
+          </div>
+
+          {/* Quick Suggestions */}
+          <div className="flex-1 overflow-y-auto p-4">
+            {!searchQuery ? (
+              <div className="space-y-6">
+                <div>
+                  <h4 className="text-xs font-bold text-gray-400 mb-3 px-1">عمليات بحث شائعة</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {['عروض', 'جديد', ...categories?.slice(0, 3).map(c => c.name) || []].map((term, i) => (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          navigate(`/portal/products?q=${encodeURIComponent(term)}`);
+                          setIsSearchOpen(false);
+                        }}
+                        className="px-4 py-2 bg-white dark:bg-gray-800 rounded-xl text-sm font-medium border border-gray-100 dark:border-gray-700 shadow-sm"
+                      >
+                        {term}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Visual Category Suggestions */}
+                <div>
+                  <h4 className="text-xs font-bold text-gray-400 mb-3 px-1">تصفح حسب القسم</h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    {categories?.slice(0, 4).map((cat, i) => (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          navigate(`/portal/products?category=${cat.slug}`);
+                          setIsSearchOpen(false);
+                        }}
+                        className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700"
+                      >
+                        <div className="w-10 h-10 bg-primary-50 dark:bg-primary-900/20 text-primary-500 rounded-lg flex items-center justify-center">
+                          <Tag className="w-5 h-5" />
+                        </div>
+                        <span className="text-sm font-bold text-right flex-1 line-clamp-1">{cat.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-10 opacity-60">
+                <Search className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                <p className="text-sm font-medium">اضغط Enter للبحث عن "{searchQuery}"</p>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -41,15 +41,15 @@ class BackupController {
         { header: 'SKU', key: 'sku', width: 15 },
         { header: 'الباركود', key: 'barcode', width: 18 },
         { header: 'الفئة', key: 'category', width: 15 },
-        { header: 'سعر البيع', key: 'sellingPrice', width: 12 },
-        { header: 'سعر الشراء', key: 'costPrice', width: 12 },
+        { header: 'سعر البيع', key: 'price', width: 12 },
+        { header: 'سعر الشراء', key: 'cost', width: 12 },
         { header: 'الكمية', key: 'quantity', width: 10 },
         { header: 'الحد الأدنى', key: 'minQuantity', width: 12 },
         { header: 'الحالة', key: 'stockStatus', width: 12 },
       ];
       products.forEach(p => prodWs.addRow({
         name: p.name, sku: p.sku, barcode: p.barcode, category: p.category,
-        sellingPrice: p.sellingPrice, costPrice: p.costPrice,
+        price: p.price, cost: p.cost,
         quantity: p.stock?.quantity || 0, minQuantity: p.stock?.minQuantity || 0,
         stockStatus: p.stockStatus,
       }));
@@ -203,8 +203,8 @@ class BackupController {
           if (!existing) {
             await Product.create({
               tenant: req.tenantId, name, sku: row['SKU'] || '', barcode: row['الباركود'] || '',
-              category: row['الفئة'] || 'عام', sellingPrice: Number(row['سعر البيع']) || 0,
-              costPrice: Number(row['سعر الشراء']) || 0,
+              category: row['الفئة'] || 'عام', price: Number(row['سعر البيع']) || 0,
+              cost: Number(row['سعر الشراء']) || 0,
               stock: { quantity: Number(row['الكمية']) || 0, minQuantity: Number(row['الحد الأدنى']) || 5 },
             });
             results.products++;

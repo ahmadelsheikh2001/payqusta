@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  ShoppingCart, Search, Package, Clock, 
+import {
+  ShoppingCart, Search, Package, Clock,
   LogOut, User, RotateCcw, FileText, Menu,
   LayoutGrid, Target, TrendingUp
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuthStore, useThemeStore, api } from '../store';
 import { Button, Card, Input, Badge, LoadingSpinner, StatCard } from '../components/UI';
-import Header from '../components/Header';
-import Sidebar from '../components/Sidebar';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
@@ -56,210 +54,200 @@ export default function BranchDashboardPage() {
   }, [user]);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex">
-       {/* Simplified Sidebar for Branch User */}
-       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} isBranchUser={true} />
+    <div className="space-y-6 animate-fade-in">
+      {/* Welcome Section */}
+      <div className="bg-gradient-to-r from-primary-600 to-primary-800 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-16 -mt-16 blur-2xl"></div>
+        <div className="relative z-10">
+          <h1 className="text-3xl font-extrabold mb-2">مرحباً، {user?.name} 👋</h1>
+          <p className="text-primary-100 text-lg mb-6">
+            {user?.branch ? `أنت تعمل الآن في: ${user.branch.name}` : 'لوحة تحكم الموظف'}
+          </p>
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <Header onMenuClick={() => setSidebarOpen(true)} />
+          <div className="flex flex-wrap gap-4">
+            <Link to="/quick-sale">
+              <Button
+                className="bg-white text-primary-600 hover:bg-gray-100 border-none shadow-lg text-lg px-8 py-4 h-auto"
+                icon={<ShoppingCart className="w-6 h-6" />}
+              >
+                بدء عملية بيع
+              </Button>
+            </Link>
+            <Link to="/products">
+              <Button
+                variant="outline"
+                className="border-white/30 text-white hover:bg-white/10"
+                icon={<Search className="w-5 h-5" />}
+              >
+                بحث عن منتج
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
-          {/* Welcome Section */}
-          <div className="bg-gradient-to-r from-primary-600 to-primary-800 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-16 -mt-16 blur-2xl"></div>
-            <div className="relative z-10">
-              <h1 className="text-3xl font-extrabold mb-2">مرحباً، {user?.name} 👋</h1>
-              <p className="text-primary-100 text-lg mb-6">
-                {user?.branch ? `أنت تعمل الآن في: ${user.branch.name}` : 'لوحة تحكم الموظف'}
-              </p>
-              
-              <div className="flex flex-wrap gap-4">
-                <Link to="/quick-sale">
-                  <Button 
-                    className="bg-white text-primary-600 hover:bg-gray-100 border-none shadow-lg text-lg px-8 py-4 h-auto"
-                    icon={<ShoppingCart className="w-6 h-6" />}
-                  >
-                    بدء عملية بيع
-                  </Button>
-                </Link>
-                <Link to="/products">
-                  <Button 
-                    variant="outline" 
-                    className="border-white/30 text-white hover:bg-white/10"
-                    icon={<Search className="w-5 h-5" />}
-                  >
-                    بحث عن منتج
-                  </Button>
-                </Link>
+      {/* Gamification & Performance Widget (Staff Only) */}
+      {!user?.isSuperAdmin && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          {/* Daily Target Progress */}
+          <div className="md:col-span-2 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-16 -mt-16 blur-3xl"></div>
+            <div className="relative z-10 flex items-center justify-between">
+              <div>
+                <h3 className="text-indigo-100 font-bold mb-2 flex items-center gap-2">
+                  <Target className="w-5 h-5" />
+                  تحدي اليوم
+                </h3>
+                <div className="flex items-end gap-2 mb-1">
+                  <span className="text-4xl font-black">
+                    {stats?.gamification ? stats.gamification.progress : 0}%
+                  </span>
+                  <span className="text-indigo-200 mb-1">من الهدف اليومي</span>
+                </div>
+                <p className="text-sm text-indigo-100 opacity-80">
+                  حققت {stats?.gamification?.currentSales?.toLocaleString() || stats?.today?.paid?.toLocaleString() || 0} من {stats?.gamification?.dailyTarget?.toLocaleString() || 10000} ج.م
+                </p>
               </div>
+
+              {/* Circular Progress (Simplified with CSS) */}
+              <div className="w-20 h-20 rounded-full border-4 border-white/30 flex items-center justify-center bg-white/10 backdrop-blur-sm">
+                <TrendingUp className="w-8 h-8 text-white" />
+              </div>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="mt-4 w-full bg-black/20 rounded-full h-3 overflow-hidden">
+              <div
+                className="bg-white h-full rounded-full transition-all duration-1000 ease-out"
+                style={{ width: `${Math.min(100, stats?.gamification?.progress || 0)}%` }}
+              />
             </div>
           </div>
 
-          {/* Gamification & Performance Widget (Staff Only) */}
-          {!user?.isSuperAdmin && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              {/* Daily Target Progress */}
-              <div className="md:col-span-2 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-16 -mt-16 blur-3xl"></div>
-                <div className="relative z-10 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-indigo-100 font-bold mb-2 flex items-center gap-2">
-                      <Target className="w-5 h-5" />
-                      تحدي اليوم
-                    </h3>
-                    <div className="flex items-end gap-2 mb-1">
-                      <span className="text-4xl font-black">
-                        {stats?.gamification ? stats.gamification.progress : 0}%
-                      </span>
-                      <span className="text-indigo-200 mb-1">من الهدف اليومي</span>
+          {/* Level & XP Card */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden">
+            <div className="text-center">
+              <div className="w-16 h-16 mx-auto bg-amber-100 dark:bg-amber-900/20 rounded-full flex items-center justify-center text-amber-500 font-black text-2xl mb-2 border-4 border-amber-50 dark:border-amber-900/40">
+                {stats?.gamification?.level || user?.gamification?.level || 1}
+              </div>
+              <h3 className="font-bold text-gray-800 dark:text-gray-100">بائع نشيط</h3>
+              <p className="text-xs text-gray-400 mb-3">المستوى الحالي</p>
+
+              <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2 mb-1">
+                <div
+                  className="bg-amber-500 h-full rounded-full transition-all duration-1000 ease-out"
+                  style={{ width: `${Math.min(100, ((stats?.gamification?.points || user?.gamification?.points || 0) % 1000) / 10)}%` }}
+                />
+              </div>
+              <p className="text-[10px] text-gray-400">{stats?.gamification?.points || user?.gamification?.points || 0} XP نقطة خبرة</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Actions Grid */}
+      <h2 className="text-xl font-bold flex items-center gap-2">
+        <LayoutGrid className="w-5 h-5 text-gray-500" />
+        الوصول السريع
+      </h2>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Link to="/quick-sale" className="group p-6 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md hover:border-primary-500 transition-all flex flex-col items-center justify-center gap-3 text-center">
+          <div className="w-14 h-14 rounded-full bg-primary-50 dark:bg-primary-500/10 flex items-center justify-center group-hover:bg-primary-500 group-hover:text-white transition-colors text-primary-500">
+            <ShoppingCart className="w-7 h-7" />
+          </div>
+          <span className="font-bold text-gray-700 dark:text-gray-300">نقطة البيع</span>
+        </Link>
+
+        <Link to="/products" className="group p-6 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md hover:border-blue-500 transition-all flex flex-col items-center justify-center gap-3 text-center">
+          <div className="w-14 h-14 rounded-full bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white transition-colors text-blue-500">
+            <Package className="w-7 h-7" />
+          </div>
+          <span className="font-bold text-gray-700 dark:text-gray-300">المخزون والمنتجات</span>
+        </Link>
+
+        <Link to="/invoices" className="group p-6 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md hover:border-emerald-500 transition-all flex flex-col items-center justify-center gap-3 text-center">
+          <div className="w-14 h-14 rounded-full bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-emerald-500 transition-colors text-emerald-500">
+            <FileText className="w-7 h-7" />
+          </div>
+          <span className="font-bold text-gray-700 dark:text-gray-300">الفواتير السابقة</span>
+        </Link>
+
+        <Link to="/returns-management" className="group p-6 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md hover:border-amber-500 transition-all flex flex-col items-center justify-center gap-3 text-center">
+          <div className="w-14 h-14 rounded-full bg-amber-50 dark:bg-amber-500/10 flex items-center justify-center group-hover:bg-amber-500 group-hover:text-white transition-colors text-amber-500">
+            <RotateCcw className="w-7 h-7" />
+          </div>
+          <span className="font-bold text-gray-700 dark:text-gray-300">المرتجعات</span>
+        </Link>
+      </div>
+
+      {/* Recent Activity / Invoices */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-bold text-lg flex items-center gap-2">
+              <Clock className="w-5 h-5 text-gray-500" />
+              آخر العمليات
+            </h3>
+            <Link to="/invoices" className="text-primary-600 text-sm font-bold hover:underline">عرض الكل</Link>
+          </div>
+
+          {loading ? (
+            <div className="py-10 flex justify-center"><LoadingSpinner /></div>
+          ) : stats?.recentInvoices?.length > 0 ? (
+            <div className="space-y-3">
+              {stats.recentInvoices.slice(0, 5).map((inv, index) => (
+                <div key={inv._id || index} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-white dark:bg-gray-700 flex items-center justify-center shadow-sm">
+                      <FileText className="w-5 h-5 text-gray-500" />
                     </div>
-                    <p className="text-sm text-indigo-100 opacity-80">
-                      حققت {stats?.gamification?.currentSales?.toLocaleString() || stats?.today?.paid?.toLocaleString() || 0} من {stats?.gamification?.dailyTarget?.toLocaleString() || 10000} ج.م
-                    </p>
+                    <div>
+                      <p className="font-bold text-sm">فاتورة #{inv.invoiceNumber}</p>
+                      <p className="text-xs text-gray-400">{format(new Date(inv.createdAt), 'hh:mm a', { locale: ar })}</p>
+                    </div>
                   </div>
-                  
-                  {/* Circular Progress (Simplified with CSS) */}
-                  <div className="w-20 h-20 rounded-full border-4 border-white/30 flex items-center justify-center bg-white/10 backdrop-blur-sm">
-                    <TrendingUp className="w-8 h-8 text-white" />
+                  <div className="text-left">
+                    <p className="font-bold">{inv.totalAmount.toLocaleString()} ج.م</p>
+                    <Badge variant={inv.status === 'paid' ? 'success' : 'warning'} size="sm">
+                      {inv.status === 'paid' ? 'مدفوع' : 'معلق'}
+                    </Badge>
                   </div>
                 </div>
-                
-                {/* Progress Bar */}
-                <div className="mt-4 w-full bg-black/20 rounded-full h-3 overflow-hidden">
-                  <div
-                    className="bg-white h-full rounded-full transition-all duration-1000 ease-out"
-                    style={{ width: `${Math.min(100, stats?.gamification?.progress || 0)}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Level & XP Card */}
-              <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden">
-                 <div className="text-center">
-                   <div className="w-16 h-16 mx-auto bg-amber-100 dark:bg-amber-900/20 rounded-full flex items-center justify-center text-amber-500 font-black text-2xl mb-2 border-4 border-amber-50 dark:border-amber-900/40">
-                     {stats?.gamification?.level || user?.gamification?.level || 1}
-                   </div>
-                   <h3 className="font-bold text-gray-800 dark:text-gray-100">بائع نشيط</h3>
-                   <p className="text-xs text-gray-400 mb-3">المستوى الحالي</p>
-
-                   <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2 mb-1">
-                     <div
-                       className="bg-amber-500 h-full rounded-full transition-all duration-1000 ease-out"
-                       style={{ width: `${Math.min(100, ((stats?.gamification?.points || user?.gamification?.points || 0) % 1000) / 10)}%` }}
-                     />
-                   </div>
-                   <p className="text-[10px] text-gray-400">{stats?.gamification?.points || user?.gamification?.points || 0} XP نقطة خبرة</p>
-                 </div>
-              </div>
+              ))}
+            </div>
+          ) : (
+            <div className="py-10 text-center text-gray-400">
+              لا توجد عمليات بيع اليوم
             </div>
           )}
+        </Card>
 
-          {/* Quick Actions Grid */}
-          <h2 className="text-xl font-bold flex items-center gap-2">
-            <LayoutGrid className="w-5 h-5 text-gray-500" />
-            الوصول السريع
-          </h2>
-          
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Link to="/quick-sale" className="group p-6 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md hover:border-primary-500 transition-all flex flex-col items-center justify-center gap-3 text-center">
-              <div className="w-14 h-14 rounded-full bg-primary-50 dark:bg-primary-500/10 flex items-center justify-center group-hover:bg-primary-500 group-hover:text-white transition-colors text-primary-500">
-                <ShoppingCart className="w-7 h-7" />
-              </div>
-              <span className="font-bold text-gray-700 dark:text-gray-300">نقطة البيع</span>
-            </Link>
-
-            <Link to="/products" className="group p-6 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md hover:border-blue-500 transition-all flex flex-col items-center justify-center gap-3 text-center">
-              <div className="w-14 h-14 rounded-full bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white transition-colors text-blue-500">
-                <Package className="w-7 h-7" />
-              </div>
-              <span className="font-bold text-gray-700 dark:text-gray-300">المخزون والمنتجات</span>
-            </Link>
-
-            <Link to="/invoices" className="group p-6 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md hover:border-emerald-500 transition-all flex flex-col items-center justify-center gap-3 text-center">
-              <div className="w-14 h-14 rounded-full bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-emerald-500 transition-colors text-emerald-500">
-                <FileText className="w-7 h-7" />
-              </div>
-              <span className="font-bold text-gray-700 dark:text-gray-300">الفواتير السابقة</span>
-            </Link>
-
-            <div className="group p-6 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm opacity-50 cursor-not-allowed flex flex-col items-center justify-center gap-3 text-center">
-              <div className="w-14 h-14 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400">
-                <RotateCcw className="w-7 h-7" />
-              </div>
-              <span className="font-bold text-gray-400">المرتجع (قريباً)</span>
+        {/* Branch Info Card */}
+        <Card className="p-5">
+          <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+            <User className="w-5 h-5 text-gray-500" />
+            معلومات الموظف
+          </h3>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
+              <span className="text-gray-500 text-sm">الاسم</span>
+              <span className="font-bold">{user?.name}</span>
+            </div>
+            <div className="flex justify-between items-center p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
+              <span className="text-gray-500 text-sm">الدور الوظيفي</span>
+              <Badge variant="primary">{user?.role === 'vendor' ? 'موظف مبيعات' : user?.role}</Badge>
+            </div>
+            <div className="flex justify-between items-center p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
+              <span className="text-gray-500 text-sm">الفرع الحالي</span>
+              <span className="font-bold">{user?.branch?.name || 'الفرع الرئيسي'}</span>
+            </div>
+            <div className="flex justify-between items-center p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
+              <span className="text-gray-500 text-sm">وقت الدخول</span>
+              <span className="font-bold font-mono">{format(new Date(), 'hh:mm a', { locale: ar })}</span>
             </div>
           </div>
-
-          {/* Recent Activity / Invoices */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-             <Card className="p-5">
-               <div className="flex items-center justify-between mb-4">
-                 <h3 className="font-bold text-lg flex items-center gap-2">
-                   <Clock className="w-5 h-5 text-gray-500" />
-                   آخر العمليات
-                 </h3>
-                 <Link to="/invoices" className="text-primary-600 text-sm font-bold hover:underline">عرض الكل</Link>
-               </div>
-               
-               {loading ? (
-                 <div className="py-10 flex justify-center"><LoadingSpinner /></div>
-               ) : stats?.recentInvoices?.length > 0 ? (
-                 <div className="space-y-3">
-                   {stats.recentInvoices.slice(0, 5).map((inv, index) => (
-                     <div key={inv._id || index} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 transition-colors">
-                       <div className="flex items-center gap-3">
-                         <div className="w-10 h-10 rounded-lg bg-white dark:bg-gray-700 flex items-center justify-center shadow-sm">
-                           <FileText className="w-5 h-5 text-gray-500" />
-                         </div>
-                         <div>
-                           <p className="font-bold text-sm">فاتورة #{inv.invoiceNumber}</p>
-                           <p className="text-xs text-gray-400">{format(new Date(inv.createdAt), 'hh:mm a', { locale: ar })}</p>
-                         </div>
-                       </div>
-                       <div className="text-left">
-                         <p className="font-bold">{inv.totalAmount.toLocaleString()} ج.م</p>
-                         <Badge variant={inv.status === 'paid' ? 'success' : 'warning'} size="sm">
-                           {inv.status === 'paid' ? 'مدفوع' : 'معلق'}
-                         </Badge>
-                       </div>
-                     </div>
-                   ))}
-                 </div>
-               ) : (
-                 <div className="py-10 text-center text-gray-400">
-                   لا توجد عمليات بيع اليوم
-                 </div>
-               )}
-             </Card>
-             
-             {/* Branch Info Card */}
-             <Card className="p-5">
-               <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                 <User className="w-5 h-5 text-gray-500" />
-                 معلومات الموظف
-               </h3>
-               <div className="space-y-4">
-                 <div className="flex justify-between items-center p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
-                    <span className="text-gray-500 text-sm">الاسم</span>
-                    <span className="font-bold">{user?.name}</span>
-                 </div>
-                 <div className="flex justify-between items-center p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
-                    <span className="text-gray-500 text-sm">الدور الوظيفي</span>
-                    <Badge variant="primary">{user?.role === 'vendor' ? 'موظف مبيعات' : user?.role}</Badge>
-                 </div>
-                 <div className="flex justify-between items-center p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
-                    <span className="text-gray-500 text-sm">الفرع الحالي</span>
-                    <span className="font-bold">{user?.branch?.name || 'الفرع الرئيسي'}</span>
-                 </div>
-                 <div className="flex justify-between items-center p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
-                    <span className="text-gray-500 text-sm">وقت الدخول</span>
-                    <span className="font-bold font-mono">{format(new Date(), 'hh:mm a', { locale: ar })}</span>
-                 </div>
-               </div>
-             </Card>
-          </div>
-
-        </main>
+        </Card>
       </div>
     </div>
   );

@@ -223,28 +223,6 @@ class AdminController {
   });
 
   /**
-   * POST /api/v1/admin/tenants/:id/reset-password
-   * Reset tenant owner password
-   */
-  resetTenantPassword = catchAsync(async (req, res, next) => {
-    const { password } = req.body;
-    if (!password || password.length < 6) {
-      return next(AppError.badRequest('كلمة المرور يجب أن تكون 6 أحرف على الأقل'));
-    }
-
-    const tenant = await Tenant.findById(req.params.id);
-    if (!tenant || !tenant.owner) return next(AppError.notFound('المتجر أو المالك غير موجود'));
-
-    const owner = await User.findById(tenant.owner);
-    if (!owner) return next(AppError.notFound('حساب المالك غير موجود'));
-
-    owner.password = password;
-    await owner.save();
-
-    ApiResponse.success(res, null, 'تم إعادة تعيين كلمة المرور بنجاح');
-  });
-
-  /**
    * GET /api/v1/admin/users
    * Get all users across all tenants
    */

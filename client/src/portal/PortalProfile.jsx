@@ -101,7 +101,10 @@ export default function PortalProfile() {
 
   const sections = [
     { id: 'info', label: 'بياناتي', icon: User },
-    { id: 'password', label: 'كلمة المرور', icon: Lock },
+    { id: 'addresses', label: 'عناويني', icon: MapPin },
+    { id: 'password', label: 'الأمان', icon: Lock },
+    { id: 'points', label: 'النقاط', icon: Star },
+    { id: 'settings', label: 'الإعدادات', icon: Bell },
     { id: 'points', label: 'نقاطي', icon: Star },
   ];
 
@@ -161,14 +164,14 @@ export default function PortalProfile() {
       </Link>
 
       {/* Section Tabs */}
-      <div className="flex bg-white dark:bg-gray-800 rounded-xl p-1 border border-gray-100 dark:border-gray-700 shadow-sm">
+      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide px-1">
         {sections.map((s) => (
           <button
             key={s.id}
             onClick={() => setActiveSection(s.id)}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-sm font-bold transition-all ${activeSection === s.id
-              ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/30'
-              : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all ${activeSection === s.id
+                ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/30'
+                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
               }`}
           >
             <s.icon className="w-4 h-4" />
@@ -189,12 +192,17 @@ export default function PortalProfile() {
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">رقم الهاتف</label>
+            <div className="flex justify-between items-center mb-1.5">
+              <label className="block text-sm font-semibold text-gray-600 dark:text-gray-400">رقم الهاتف</label>
+              {/* Note: This is a UI UX placeholder for a real OTP modal if implemented */}
+              <button type="button" onClick={() => notify.info('سيتم إرسال كود OTP لتأكيد تغيير الرقم قريباً.')} className="text-xs text-primary-500 hover:underline">
+                تغيير الرقم
+              </button>
+            </div>
             <div className="relative">
               <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input type="text" value={customer?.phone || ''} className={`${inputClass} opacity-60 cursor-not-allowed`} disabled />
             </div>
-            <p className="text-[11px] text-gray-400 mt-1">رقم الهاتف لا يمكن تغييره</p>
           </div>
 
           <div>
@@ -205,19 +213,7 @@ export default function PortalProfile() {
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5 flex justify-between items-center">
-              <span>العنوان</span>
-              <Link to="/portal/addresses" className="text-xs text-primary-500 hover:text-primary-600 flex items-center gap-1 transition-colors">
-                <MapPin className="w-3 h-3" />
-                إدارة العناوين
-              </Link>
-            </label>
-            <div className="relative">
-              <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} className={inputClass} placeholder="العنوان (اختياري)" />
-            </div>
-          </div>
+
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -309,6 +305,14 @@ export default function PortalProfile() {
                   {showNewPass ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
+              {/* Fake Password Strength for better UX affordance */}
+              {newPassword && (
+                <div className="mt-2 flex items-center gap-1">
+                  <div className={`h-1 flex-1 rounded-full ${newPassword.length > 0 ? 'bg-red-400' : 'bg-gray-200 dark:bg-gray-700'}`} />
+                  <div className={`h-1 flex-1 rounded-full ${newPassword.length >= 6 ? 'bg-yellow-400' : 'bg-gray-200 dark:bg-gray-700'}`} />
+                  <div className={`h-1 flex-1 rounded-full ${newPassword.length >= 8 && /[A-Za-z]/.test(newPassword) && /[0-9]/.test(newPassword) ? 'bg-green-400' : 'bg-gray-200 dark:bg-gray-700'}`} />
+                </div>
+              )}
             </div>
 
             <div>
@@ -444,6 +448,48 @@ export default function PortalProfile() {
           </div>
         )
       }
+
+      {/* Settings Sections Placeholders for explicit flow navigation */}
+      {
+        activeSection === 'addresses' && (
+          <div className="bg-white dark:bg-gray-800/80 rounded-2xl p-8 border border-gray-100 dark:border-gray-700 shadow-sm text-center">
+            <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">إدارة العناوين</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 max-w-sm mx-auto">إضافة وتعديل عناوين التوصيل الخاصة بك لسهولة الشراء.</p>
+            <Link to="/portal/addresses" className="inline-flex items-center gap-2 bg-primary-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-primary-500/30 hover:shadow-primary-500/50 transition-all">
+              الانتقال لصفحة العناوين
+            </Link>
+          </div>
+        )
+      }
+
+      {
+        activeSection === 'settings' && (
+          <div className="bg-white dark:bg-gray-800/80 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden divide-y divide-gray-100 dark:divide-gray-800">
+            <div className="p-4 flex items-center justify-between">
+              <div>
+                <h4 className="font-bold text-gray-900 dark:text-white text-sm">تنبيهات العروض</h4>
+                <p className="text-xs text-gray-500 mt-1">استلام إشعارات بالخصومات والعروض الجديدة</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" className="sr-only peer" defaultChecked />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:-translate-x-full peer-checked:bg-primary-500 after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+              </label>
+            </div>
+            <div className="p-4 flex items-center justify-between">
+              <div>
+                <h4 className="font-bold text-gray-900 dark:text-white text-sm">تنبيهات الطلبات</h4>
+                <p className="text-xs text-gray-500 mt-1">إشعارات بتحديث حالات الطلب والشحن</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" className="sr-only peer" defaultChecked />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:-translate-x-full peer-checked:bg-primary-500 after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+              </label>
+            </div>
+          </div>
+        )
+      }
+
     </div >
   );
 }
